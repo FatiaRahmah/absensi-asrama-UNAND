@@ -37,7 +37,19 @@ app.use(async (ctx, next) => {
   ctx.set('X-Content-Type-Options', 'nosniff');
   ctx.body = fs.createReadStream(requestedPath);
 });
-app.use(serve(path.join(__dirname, '../public')));
+// Frontend React (hasil `npm run build:frontend`); jika belum di-build, pakai UI lama di /public.
+const reactDist = path.join(__dirname, '../frontend/dist');
+const hasReactBuild = fs.existsSync(path.join(reactDist, 'index.html'));
+app.use(serve(hasReactBuild ? reactDist : path.join(__dirname, '../public')));
+if (hasReactBuild) {
+  app.use(async (ctx, next) => {
+    await next();
+    if (ctx.status === 404 && ctx.method === 'GET' && !ctx.path.startsWith('/api')) {
+      ctx.type = 'html';
+      ctx.body = fs.createReadStream(path.join(reactDist, 'index.html'));
+    }
+  });
+}
 
 async function testConnection() {
   try {
@@ -49,6 +61,11 @@ async function testConnection() {
 }
 
 testConnection();
+
+const { ensureAlpa } = require('./utils/attendance');
+const runAutoAlpa = () => ensureAlpa().catch(err => console.error('Auto-alpa gagal:', err.message));
+runAutoAlpa();
+setInterval(runAutoAlpa, 60 * 1000);
 
 app.listen(PORT, () => {
   console.log(`🚀 Server Koa berjalan di http://localhost:${PORT}`);

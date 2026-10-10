@@ -475,152 +475,254 @@
           <div class="breadcrumb">SUPERVISI TERITORIAL • <span>Semester Ganjil 2024/2025</span></div>
           <div class="page-header">
             <div class="page-title-area">
-              <h1>Dashboard Supervisi Fasilitator</h1>
-              <p>Monitoring kepatuhan jam malam, presensi biometrik Shubuh & Malam, dan disposisi permohonan izin penghuni binaan.</p>
-            </div>
-
-            <div class="btn-row">
-              <button class="btn btn-outline btn-sm" onclick="showToast('Laporan PDF diekspor', 'success')">Ekspor Laporan</button>
+              <h1>Supervisi Fasilitator Asrama</h1>
+              <p>Monitoring kehadiran penghuni binaan dan kelola persetujuan izin.</p>
             </div>
           </div>
 
-          <div class="grid-stats-4">
-            <div class="stat-card">
-              <div class="stat-card-info">
-                <p>TOTAL PENGHUNI BINAAN</p>
-                <h3>120</h3>
-                <span style="color: var(--primary); font-weight: 700;">36 Kamar Aktif Terisi</span>
-              </div>
-            </div>
-
-            <div class="stat-card">
-              <div class="stat-card-info">
-                <p>SUDAH PRESENSI</p>
-                <h3>114 <span class="pill-badge-green">95.0%</span></h3>
-                <div class="progress-bar-bg" style="margin-top: 6px; width: 140px;"><div class="progress-bar-fill" style="width: 95%;"></div></div>
-              </div>
-            </div>
-
-            <div class="stat-card">
-              <div class="stat-card-info">
-                <p>PENGAJUAN IZIN</p>
-                <h3>4 <span class="badge-tag formal" style="font-size: 10px;">2 Menunggu</span></h3>
-                <span>2 izin telah disetujui</span>
-              </div>
-            </div>
-
-            <div class="stat-card">
-              <div class="stat-card-info">
-                <p>BELUM PRESENSI / ALPA</p>
-                <h3 style="color: #dc2626;">2</h3>
-                <span style="color: #dc2626; font-weight: 600;">Kamar B-102 & B-308</span>
-              </div>
-            </div>
+          <div class="filter-tabs" id="fasil-sub-tabs" style="margin-bottom: 20px; display: inline-flex;">
+            <button class="filter-tab active" data-tab="dashboard">📊 Dashboard Utama</button>
+            <button class="filter-tab" data-tab="rekap">📑 Rekap & Riwayat</button>
           </div>
 
-          <div class="card">
-            <div class="card-title-row">
-              <div>
-                <h3>Antrean Persetujuan Izin Penghuni</h3>
-                <p style="font-size: 11.5px; color: var(--text-muted);">Disposisi permohonan ketidakhadiran yang membutuhkan persetujuan Fasilitator.</p>
-              </div>
-              <span class="badge-tag formal" style="background:#fef3c7; color:#b45309;">2 Menunggu Disposisi</span>
-            </div>
-
-            <div class="approval-queue-grid" id="facilitator-approval-queue">
-              <!-- Rendered by app.js -->
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="card-title-row">
-              <div>
-                <h3>Monitoring Kehadiran Mahasiswa Binaan</h3>
-                <p style="font-size: 11.5px; color: var(--text-muted);">Data verifikasi presensi kamera langsung dari penghuni</p>
+          <!-- TAB: DASHBOARD -->
+          <div id="fasil-tab-dashboard">
+            <div class="grid-stats-4">
+              <div class="stat-card">
+                <div class="stat-card-info">
+                  <p>TOTAL PENGHUNI BINAAN</p>
+                  <h3 id="fasil-stat-total">0</h3>
+                  <span style="color: var(--primary); font-weight: 700;">Aktif</span>
+                </div>
               </div>
 
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <input type="text" id="search-fasil-input" class="form-input" placeholder="Cari nama atau NIM..." style="width: 220px; padding: 6px 10px;" />
+              <div class="stat-card">
+                <div class="stat-card-info">
+                  <p>SUDAH PRESENSI HARI INI</p>
+                  <h3><span id="fasil-stat-hadir">0</span> <span class="pill-badge-green" id="fasil-stat-persen">0%</span></h3>
+                  <div class="progress-bar-bg" style="margin-top: 6px; width: 140px;"><div class="progress-bar-fill" id="fasil-stat-bar" style="width: 0%;"></div></div>
+                </div>
+              </div>
+
+              <div class="stat-card">
+                <div class="stat-card-info">
+                  <p>PENGAJUAN IZIN</p>
+                  <h3><span id="fasil-stat-izin">0</span> <span class="badge-tag formal" style="font-size: 10px;" id="fasil-stat-pending">0 Menunggu</span></h3>
+                  <span>Perlu tindakan</span>
+                </div>
+              </div>
+
+              <div class="stat-card">
+                <div class="stat-card-info">
+                  <p>BELUM ABSEN / ALPA</p>
+                  <h3 style="color: #dc2626;" id="fasil-stat-alpa">0</h3>
+                  <span style="color: #dc2626; font-weight: 600;">Hari Ini</span>
+                </div>
               </div>
             </div>
 
-            <div class="table-wrapper">
-              <table class="custom-table">
-                <thead>
-                  <tr>
-                    <th>Mahasiswa</th>
-                    <th>Kamar & Lokasi</th>
-                    <th>Waktu Presensi</th>
-                    <th>Foto Verifikasi</th>
-                    <th>Status Validasi</th>
-                    <th>Aksi Fasilitator</th>
-                  </tr>
-                </thead>
-                <tbody id="tbody-facilitator-monitoring">
+            <div class="grid-admin-layout" style="grid-template-columns: 2fr 1fr; margin-top: 20px;">
+              <!-- Kolom Kiri: Izin Pending -->
+              <div class="card" style="border: 2px solid var(--primary-light);">
+                <div class="card-title-row">
+                  <div>
+                    <h3 style="color: var(--primary-dark);">🚨 Antrean Persetujuan Izin</h3>
+                    <p style="font-size: 11.5px; color: var(--text-muted);">Menuntut aksi segera dari Fasilitator.</p>
+                  </div>
+                  <span class="badge-tag formal" style="background:#fef3c7; color:#b45309;" id="badge-izin-pending">0 Menunggu</span>
+                </div>
+
+                <div class="approval-queue-grid" id="facilitator-approval-queue">
                   <!-- Rendered by app.js -->
-                </tbody>
-              </table>
+                </div>
+              </div>
+
+              <!-- Kolom Kanan: Perlu Perhatian -->
+              <div class="card" style="border: 1px solid #fca5a5;">
+                <div class="card-title-row" style="margin-bottom: 14px;">
+                  <div>
+                    <h3 style="color: #b91c1c;">⚠️ Perlu Perhatian</h3>
+                    <p style="font-size: 11px; color: var(--text-muted);">Penghuni dengan Alpa berulang</p>
+                  </div>
+                </div>
+                <div id="fasil-perhatian-list">
+                  <!-- Rendered by app.js -->
+                  <div style="text-align:center; padding:20px; color:var(--text-muted); font-size:12px;">Memuat data...</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB: REKAP & RIWAYAT -->
+          <div id="fasil-tab-rekap" style="display: none;">
+            <div class="card">
+              <div class="card-title-row" style="flex-wrap: wrap; gap: 12px;">
+                <div>
+                  <h3>Rekapitulasi Kehadiran Penghuni</h3>
+                  <p style="font-size: 11.5px; color: var(--text-muted);">Laporan kumulatif untuk evaluasi bulanan.</p>
+                </div>
+
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                  <input type="date" id="filter-date-start" class="form-input" style="padding: 6px 10px; width: 140px; font-size: 12px;" />
+                  <span style="font-size: 12px; color: var(--text-muted);">s/d</span>
+                  <input type="date" id="filter-date-end" class="form-input" style="padding: 6px 10px; width: 140px; font-size: 12px;" />
+                  
+                  <select id="filter-sesi-rekap" class="form-select" style="padding: 6px 10px; width: 120px; font-size: 12px;">
+                    <option value="semua">Semua Sesi</option>
+                    <option value="shubuh">Sesi Shubuh</option>
+                    <option value="malam">Sesi Malam</option>
+                  </select>
+
+                  <button class="btn btn-primary btn-sm" id="btn-export-csv">📥 Ekspor CSV</button>
+                </div>
+              </div>
+
+              <div class="table-wrapper" style="margin-top: 16px;">
+                <table class="custom-table">
+                  <thead>
+                    <tr>
+                      <th>Nama Penghuni</th>
+                      <th>NIM</th>
+                      <th style="text-align:center;">Hadir</th>
+                      <th style="text-align:center;">Izin</th>
+                      <th style="text-align:center;">Alpa</th>
+                      <th style="text-align:center;">% Hadir</th>
+                      <th>Aksi (Koreksi)</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tbody-fasil-rekap">
+                    <!-- Rendered by app.js -->
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
 
         </section>
 
 
-        <!-- VIEW 4: MANAJEMEN ADMIN -->
+
+        <!-- VIEW 4: ADMIN PANEL TERPADU -->
         <section id="view-admin" class="view-page">
           
-          <div class="breadcrumb">Admin Panel > <span>Master Data</span></div>
+          <div class="breadcrumb">Admin Panel > <span id="admin-bc-text">Monitoring Asrama</span></div>
           <div class="page-header">
             <div class="page-title-area">
-              <h1>Manajemen Data Master Asrama UNAND</h1>
-              <p>Kelola penetapan kamar, pendamping fasilitator, kuota gedung, dan tambah data penghuni atau fasilitator baru.</p>
-            </div>
-
-            <div class="btn-row">
-              <button class="btn btn-outline" onclick="App.openAddFasilModal()">+ Tambah Fasilitator</button>
-              <button class="btn btn-primary" onclick="showToast('Form tambah penghuni aktif di sidebar kanan', 'success')">+ Tambah Penghuni</button>
+              <h1 id="admin-title-text">Dashboard Monitoring Asrama</h1>
+              <p id="admin-subtitle-text">Pantau skala sistem, rekap per gedung, dan masalah data secara keseluruhan.</p>
             </div>
           </div>
 
-          <div class="filter-tabs" id="admin-sub-tabs" style="margin-bottom: 20px; display: inline-flex;">
-            <button class="filter-tab active" data-tab="penghuni">Data Penghuni Asrama (850)</button>
-            <button class="filter-tab" data-tab="fasilitator">Data Fasilitator (24)</button>
+          <div class="filter-tabs" id="admin-main-tabs" style="margin-bottom: 20px; display: inline-flex;">
+            <button class="filter-tab active" data-tab="monitoring">📊 Monitoring</button>
+            <button class="filter-tab" data-tab="manajemen">👥 Manajemen Pengguna</button>
+            <button class="filter-tab" data-tab="riwayat">📑 Riwayat Presensi</button>
           </div>
 
-          <div id="sec-admin-students">
-            <div class="grid-admin-layout">
-              
-              <div class="card">
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
-                  <input type="text" id="search-admin-input" class="form-input" placeholder="Cari NIM (contoh: 2311522001), nama..." style="max-width: 320px;" />
-                  <span style="font-size: 12px; color: var(--text-muted); font-weight: 600;">Menampilkan data mahasiswa</span>
+          <!-- TAB 1: MONITORING ADMIN -->
+          <div id="admin-tab-monitoring">
+            <div class="grid-stats-4">
+              <div class="stat-card">
+                <div class="stat-card-info">
+                  <p>TOTAL PENGHUNI AKTIF</p>
+                  <h3 id="adm-stat-penghuni">0</h3>
+                  <span>Kapasitas Sistem</span>
                 </div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-card-info">
+                  <p>TOTAL FASILITATOR</p>
+                  <h3 id="adm-stat-fasil">0</h3>
+                  <span>Pengawas Aktif</span>
+                </div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-card-info">
+                  <p>KEHADIRAN HARI INI (SHUBUH)</p>
+                  <h3><span id="adm-stat-shubuh">0</span>%</h3>
+                  <div class="progress-bar-bg" style="margin-top:6px;width:100%;"><div class="progress-bar-fill" id="adm-bar-shubuh" style="width:0%;"></div></div>
+                </div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-card-info">
+                  <p>KEHADIRAN HARI INI (MALAM)</p>
+                  <h3><span id="adm-stat-malam">0</span>%</h3>
+                  <div class="progress-bar-bg" style="margin-top:6px;width:100%;"><div class="progress-bar-fill" id="adm-bar-malam" style="width:0%;"></div></div>
+                </div>
+              </div>
+            </div>
 
+            <div class="grid-admin-layout" style="grid-template-columns: 2fr 1fr; margin-top: 20px;">
+              <!-- Kiri: Rekap Per Gedung -->
+              <div class="card">
+                <div class="card-title-row">
+                  <div>
+                    <h3>Rekap Kehadiran per Gedung</h3>
+                    <p style="font-size:11px;color:var(--text-muted);">Memudahkan melacak gedung yang bermasalah.</p>
+                  </div>
+                </div>
                 <div class="table-wrapper">
                   <table class="custom-table">
                     <thead>
                       <tr>
-                        <th style="width: 30px;"><input type="checkbox" /></th>
-                        <th>Mahasiswa & NIM</th>
-                        <th>Fakultas / Program Studi</th>
-                        <th>Alokasi Kamar</th>
-                        <th>Fasilitator Pendamping</th>
+                        <th>Gedung Asrama</th>
+                        <th>Penghuni</th>
+                        <th>Hadir Shubuh</th>
+                        <th>Hadir Malam</th>
                         <th>Status</th>
                       </tr>
                     </thead>
-                    <tbody id="tbody-admin-master">
-                      <!-- Rendered by app.js -->
+                    <tbody id="tbody-adm-gedung">
+                      <tr><td colspan="5" style="text-align:center;">Memuat data...</td></tr>
                     </tbody>
                   </table>
                 </div>
+                
+                <div style="margin-top: 20px;">
+                  <h4 style="font-size: 13px; margin-bottom: 10px;">Tren Kehadiran (7 Hari Terakhir)</h4>
+                  <div style="height: 120px; background: var(--bg-subtle); border-radius: 8px; border: 1px dashed var(--border-color); display:flex; align-items:center; justify-content:center; color:var(--text-muted); font-size:12px;">
+                    [Grafik Tren Presensi - Placeholder]
+                  </div>
+                </div>
               </div>
 
-              <div class="card">
-                <div class="card-title-row">
-                  <h3>Tambah Penghuni Baru</h3>
+              <!-- Kanan: Perlu Ditindaklanjuti -->
+              <div class="card" style="border:1px solid #fca5a5;">
+                <div class="card-title-row" style="margin-bottom:14px;">
+                  <div>
+                    <h3 style="color:#b91c1c;">⚠️ Perlu Ditindaklanjuti</h3>
+                    <p style="font-size:11px;color:var(--text-muted);">Masalah master data & izin gantung</p>
+                  </div>
                 </div>
+                <div id="adm-action-list" style="font-size: 12px;">
+                  <!-- Rendered via app.js -->
+                </div>
+              </div>
+            </div>
+          </div>
 
+          <!-- TAB 2: MANAJEMEN PENGGUNA (Form Dinamis) -->
+          <div id="admin-tab-manajemen" style="display: none;">
+            <!-- ===== PENGHUNI SECTION (Ganti jadi dinamis nanti) ===== -->
+            <div class="filter-tabs" id="admin-sub-tabs" style="margin-bottom: 20px; display: inline-flex;">
+              <button class="filter-tab active" data-tab="penghuni" id="tab-penghuni">👤 Data Penghuni</button>
+              <button class="filter-tab" data-tab="fasilitator" id="tab-fasilitator">👔 Data Fasilitator</button>
+            </div>
+
+          <!-- ===== PENGHUNI SECTION ===== -->
+          <div id="sec-admin-students">
+            <div class="grid-admin-layout">
+              
+              <div class="card">
+                <div class="card-title-row" style="margin-bottom: 14px;">
+                  <div>
+                    <h3 id="form-student-title">👤 Buat / Edit Penghuni</h3>
+                    <p style="font-size: 11.5px; color: var(--text-muted);">Isi formulir untuk membuat atau memperbarui data penghuni.</p>
+                  </div>
+                  <button class="btn btn-outline btn-sm" id="btn-reset-student-form" style="display:none;">✕ Batal Edit</button>
+                </div>
                 <form id="form-quick-student">
+                  <input type="hidden" id="student-edit-nim" value="" />
                   <div class="form-group">
                     <label class="form-label">NIM Mahasiswa <span class="req">*</span></label>
                     <input type="text" id="quick-nim" class="form-input" placeholder="Contoh: 2411523005" required />
@@ -631,42 +733,184 @@
                   </div>
                   <div class="form-group">
                     <label class="form-label">Email <span class="req">*</span></label>
-                    <input type="email" id="quick-email" class="form-input" required />
+                    <input type="email" id="quick-email" class="form-input" placeholder="Contoh: nama@domain.com" required />
                   </div>
                   <div class="form-group">
-                    <label class="form-label">Password awal <span class="req">*</span></label>
-                    <input type="password" id="quick-password" class="form-input" minlength="8" required />
+                    <label class="form-label">Password <span id="lbl-student-pw" class="req">*</span></label>
+                    <input type="password" id="quick-password" class="form-input" minlength="6" />
+                    <span style="font-size:11px;color:var(--text-muted);" id="hint-student-pw">Min. 6 karakter</span>
                   </div>
-
+                  <div class="form-group">
+                    <label class="form-label">Gedung Asrama</label>
+                    <select id="quick-gedung" class="form-select">
+                      <option value="">-- Pilih Gedung --</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Nomor Kamar</label>
+                    <select id="quick-kamar" class="form-select" disabled>
+                      <option value="">-- Pilih Kamar --</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Fasilitator Pembimbing</label>
+                    <select id="quick-fasil" class="form-select">
+                      <option value="">-- Pilih Fasilitator --</option>
+                    </select>
+                  </div>
                   <div class="btn-row">
-                    <button type="submit" class="btn btn-primary btn-block">Simpan Penghuni</button>
+                    <button type="submit" class="btn btn-primary btn-block" id="btn-submit-student">💾 Simpan Penghuni</button>
                   </div>
                 </form>
+              </div>
+
+              <div class="card">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+                  <h3>Daftar Penghuni</h3>
+                  <input type="text" id="search-admin-input" class="form-input" placeholder="Cari NIM atau nama..." style="max-width: 220px;" />
+                </div>
+
+                <div class="table-wrapper">
+                  <table class="custom-table">
+                    <thead>
+                      <tr>
+                        <th>Mahasiswa & NIM</th>
+                        <th>Gedung & Kamar</th>
+                        <th>Fasilitator</th>
+                        <th>Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody id="tbody-admin-master">
+                      <!-- Rendered by app.js -->
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
             </div>
           </div>
 
+          <!-- ===== FASILITATOR SECTION ===== -->
           <div id="sec-admin-facilitators" style="display: none;">
+            <div class="grid-admin-layout">
+
+              <div class="card">
+                <div class="card-title-row" style="margin-bottom: 14px;">
+                  <div>
+                    <h3 id="form-fasil-title">👔 Buat / Edit Fasilitator</h3>
+                    <p style="font-size: 11.5px; color: var(--text-muted);">Tetapkan fasilitator dan gedung pengawasannya.</p>
+                  </div>
+                  <button class="btn btn-outline btn-sm" id="btn-reset-fasil-form" style="display:none;">✕ Batal Edit</button>
+                </div>
+                <form id="form-inline-fasil">
+                  <input type="hidden" id="fasil-edit-nim" value="" />
+                  <div class="form-group">
+                    <label class="form-label">NIP / ID Fasilitator <span class="req">*</span></label>
+                    <input type="text" id="inline-fasil-nip" class="form-input" placeholder="Contoh: 199205122020011005" required />
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Nama Lengkap <span class="req">*</span></label>
+                    <input type="text" id="inline-fasil-nama" class="form-input" placeholder="Nama lengkap fasilitator" required />
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Email <span class="req">*</span></label>
+                    <input type="email" id="inline-fasil-email" class="form-input" placeholder="Contoh: nama@domain.com" required />
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Password <span id="lbl-fasil-pw" class="req">*</span></label>
+                    <input type="password" id="inline-fasil-password" class="form-input" minlength="6" />
+                    <span style="font-size:11px;color:var(--text-muted);" id="hint-fasil-pw">Min. 6 karakter</span>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Gedung Pengawasan <span class="req">*</span></label>
+                    <select id="inline-fasil-gedung" class="form-select" required>
+                      <option value="">-- Pilih Gedung --</option>
+                    </select>
+                  </div>
+                  <div class="btn-row">
+                    <button type="submit" class="btn btn-primary btn-block" id="btn-submit-fasil">💾 Simpan Fasilitator</button>
+                  </div>
+                </form>
+              </div>
+
+              <div class="card">
+                <div class="card-title-row" style="margin-bottom:14px;">
+                  <h3>Daftar Fasilitator</h3>
+                </div>
+                <div class="table-wrapper">
+                  <table class="custom-table">
+                    <thead>
+                      <tr>
+                        <th>Fasilitator & NIP</th>
+                        <th>Gedung Pengawasan</th>
+                        <th>Jml. Penghuni Binaan</th>
+                        <th>Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody id="tbody-admin-facilitators">
+                      <!-- Rendered by app.js -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- TAB 3: RIWAYAT & LAPORAN ADMIN -->
+          <div id="admin-tab-riwayat" style="display: none;">
             <div class="card">
-              <div class="card-title-row">
-                <h3>Master Data Fasilitator Asrama</h3>
-                <button class="btn btn-primary btn-sm" onclick="App.openAddFasilModal()">+ Tambah Fasilitator</button>
+              <div class="card-title-row" style="flex-wrap: wrap; gap: 12px; margin-bottom: 20px;">
+                <div>
+                  <h3>Riwayat Presensi Seluruh Asrama</h3>
+                  <p style="font-size: 11.5px; color: var(--text-muted);">Log biometrik, izin, dan alpa dengan fitur koreksi jarak.</p>
+                </div>
+                <button class="btn btn-primary btn-sm" id="btn-adm-export">📥 Ekspor Laporan CSV</button>
+              </div>
+
+              <!-- Filter Bar -->
+              <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; background: var(--bg-subtle); padding: 12px; border-radius: 8px;">
+                <input type="date" class="form-input" id="adm-filter-date" style="width: 140px; font-size: 12px; padding: 6px 10px;" />
+                
+                <select id="adm-filter-gedung" class="form-select" style="width: 140px; font-size: 12px; padding: 6px 10px;">
+                  <option value="">Semua Gedung</option>
+                </select>
+
+                <select id="adm-filter-kamar" class="form-select" style="width: 120px; font-size: 12px; padding: 6px 10px;">
+                  <option value="">Semua Kamar</option>
+                </select>
+                
+                <select id="adm-filter-sesi" class="form-select" style="width: 120px; font-size: 12px; padding: 6px 10px;">
+                  <option value="">Semua Sesi</option>
+                  <option value="shubuh">Sesi Shubuh</option>
+                  <option value="malam">Sesi Malam</option>
+                </select>
+
+                <select id="adm-filter-status" class="form-select" style="width: 120px; font-size: 12px; padding: 6px 10px;">
+                  <option value="">Semua Status</option>
+                  <option value="hadir">Hadir</option>
+                  <option value="izin">Izin</option>
+                  <option value="alpa">Alpa</option>
+                </select>
+
+                <input type="text" id="adm-filter-search" class="form-input" placeholder="Cari nama / NIM..." style="width: 160px; font-size: 12px; padding: 6px 10px; flex-grow: 1;" />
               </div>
 
               <div class="table-wrapper">
                 <table class="custom-table">
                   <thead>
                     <tr>
-                      <th>Fasilitator & NIP</th>
-                      <th>Gedung Pengawasan</th>
-                      <th>Jumlah Binaan</th>
-                      <th>No. WhatsApp</th>
-                      <th>Status</th>
+                      <th>Waktu</th>
+                      <th>Penghuni</th>
+                      <th>Lokasi Asrama</th>
+                      <th>Sesi & Status</th>
+                      <th>Foto Validasi</th>
+                      <th>Data Lokasi (GPS)</th>
+                      <th>Aksi</th>
                     </tr>
                   </thead>
-                  <tbody id="tbody-admin-facilitators">
-                    <!-- Rendered by app.js -->
+                  <tbody id="tbody-adm-riwayat">
+                    <tr><td colspan="7" style="text-align:center;">Memuat data riwayat...</td></tr>
                   </tbody>
                 </table>
               </div>

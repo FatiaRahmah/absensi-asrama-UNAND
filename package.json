@@ -5,7 +5,7 @@
     "@prisma/client": "5.22.0",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
-    "dotenv": "^18.0.3",
+    "dotenv": "^18.0.6",
     "jsonwebtoken": "^9.0.3",
     "koa": "^3.2.1",
     "koa-bodyparser": "^4.4.1",
@@ -20,7 +20,10 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon src/app.js",
     "start": "node src/app.js",
-    "bootstrap:admin": "node scripts/bootstrapAdmin.js"
+    "bootstrap:admin": "node scripts/bootstrapAdmin.js",
+    "build:frontend": "npm --prefix frontend run build",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "install:frontend": "npm --prefix frontend install"
   },
   "keywords": [],
   "author": "",

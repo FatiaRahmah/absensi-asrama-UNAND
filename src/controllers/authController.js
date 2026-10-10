@@ -5,27 +5,17 @@ const prisma = require('../config/database');
 const viewPermissions = {
 	penghuni: ['view-camera', 'view-riwayat'],
 	fasil: ['view-fasilitator', 'view-riwayat-fasil'],
-	admin: ['view-admin', 'view-fasilitator', 'view-riwayat-fasil']
+	admin: ['view-admin-monitoring', 'view-admin-pengguna', 'view-admin-riwayat']
 };
 
-function configuredNims(name) {
-	return new Set((process.env[name] || '').split(',').map(value => value.trim()).filter(Boolean));
-}
-
-function roleFor(nim) {
-	if (configuredNims('ADMIN_NIMS').has(nim)) return 'admin';
-	if (configuredNims('FACILITATOR_NIMS').has(nim)) return 'fasil';
-	return 'penghuni';
-}
-
 function serializeUser(user) {
-	const role = roleFor(user.nim);
+	const role = user.role || 'penghuni';
 	return {
 		id: user.nim,
 		nim: user.nim,
 		name: user.nama,
 		email: user.email,
-		role: role === 'fasil' ? 'fasilitator' : role,
+		role: role,
 		roleTitle: role === 'penghuni' ? 'Penghuni' : role === 'fasil' ? 'Fasilitator' : 'Administrator',
 		avatar: '',
 		allowedViews: viewPermissions[role] || []
@@ -40,12 +30,13 @@ async function login(ctx) {
 	}
 
 	const users = await prisma.$queryRaw`
-		SELECT nim, nama, email, password, kamar_id
+		SELECT nim, nama, email, password, kamar_id, role, aktif
 		FROM \`user\`
 		WHERE nim = ${identifier} OR email = ${identifier}
 		LIMIT 1
 	`;
 	const user = users[0];
+	if (user && !user.aktif) ctx.throw(403, 'Akun dinonaktifkan. Hubungi admin asrama');
 	const isBcryptHash = user && /^\$2[aby]\$\d{2}\$/.test(user.password);
 	const passwordIsValid = user && (isBcryptHash
 		? await bcrypt.compare(password, user.password)
@@ -65,7 +56,7 @@ async function login(ctx) {
 	}
 
 	const token = jwt.sign(
-		{ nim: user.nim, role: roleFor(user.nim) },
+		{ nim: user.nim, role: user.role || 'penghuni' },
 		process.env.JWT_SECRET,
 		{ expiresIn: '12h' }
 	);
@@ -75,7 +66,7 @@ async function login(ctx) {
 
 async function me(ctx) {
 	const users = await prisma.$queryRaw`
-		SELECT nim, nama, email, kamar_id
+		SELECT nim, nama, email, kamar_id, role
 		FROM \`user\`
 		WHERE nim = ${ctx.state.user.nim}
 		LIMIT 1
@@ -85,4 +76,4 @@ async function me(ctx) {
 	ctx.body = { user: serializeUser(user) };
 }
 
-module.exports = { login, me, roleFor, serializeUser };
+module.exports = { login, me, serializeUser };

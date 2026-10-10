@@ -7,85 +7,108 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
-  admin
-  fasil
-  penghuni
+model gedung {
+  id      Int     @id @default(autoincrement())
+  nama    String  @db.VarChar(100)
+  id_user Int?
+  kamar   kamar[]
+  fasil   user[]  @relation("FasilGedung")
 }
 
-enum JenisPresensi {
-  subuh
-  malam
+model izin {
+  id          Int         @id @default(autoincrement())
+  nim         String      @db.VarChar(20)
+  tanggal     DateTime    @db.Date
+  alasan      String      @db.Text
+  file_bukti  String?     @db.VarChar(255)
+  status_izin izin_status @default(pending)
+  created_at  DateTime    @default(now()) @db.DateTime(0)
+  user        user        @relation(fields: [nim], references: [nim], onDelete: Cascade, map: "izin_ibfk_1")
+
+  @@index([nim], map: "nim")
 }
 
-enum StatusPresensi {
-  hadir
-  terlambat
-  alpa
-  izin
-}
-
-enum StatusIzin {
+enum izin_status {
   pending
   disetujui
   ditolak
 }
 
-model User {
-  id         Int      @id @default(autoincrement())
-  nim_nip    String?  @unique
-  nama       String
-  email      String   @unique
-  password   String
-  role       Role
-  id_kamar   Int?
-  kamar      Kamar?   @relation(fields: [id_kamar], references: [id])
-  presensi   Presensi[]
-  izin       Izin[]   @relation("PenghuniIzin")
-  izinDiproses Izin[] @relation("FasilIzin")
-  created_at DateTime @default(now())
-}
-
-model Gedung {
-  id         Int    @id @default(autoincrement())
-  nama_gedung String
-  kamar      Kamar[]
-}
-
-model Kamar {
+model kamar {
   id        Int    @id @default(autoincrement())
-  id_gedung Int
-  gedung    Gedung @relation(fields: [id_gedung], references: [id])
-  no_kamar  String
+  no_kamar  String @db.VarChar(20)
   lantai    Int
-  penghuni  User[]
+  gedung_id Int
+  kapasitas Int    @default(2)
+  gedung    gedung @relation(fields: [gedung_id], references: [id], onDelete: Cascade, map: "kamar_ibfk_1")
+  user      user[]
+
+  @@index([gedung_id], map: "gedung_id")
 }
 
-model Presensi {
-  id              Int            @id @default(autoincrement())
-  id_user         Int
-  user            User           @relation(fields: [id_user], references: [id])
-  jenis_presensi  JenisPresensi
-  tanggal         DateTime       @db.Date
-  waktu_presensi  DateTime
-  lat             Float
-  long            Float
-  foto_wajah      String
-  status          StatusPresensi
-  keterangan      String?
+model presensi {
+  id         Int             @id @default(autoincrement())
+  nim        String          @db.VarChar(20)
+  tanggal    DateTime        @db.Date
+  jam        DateTime        @db.Time(0)
+  waktu      DateTime        @db.DateTime(0)
+  lat        Decimal?        @db.Decimal(10, 8)
+  long       Decimal?        @db.Decimal(11, 8)
+  status     presensi_status
+  sesi       presensi_sesi
+  foto_wajah String?         @db.VarChar(255)
+  keterangan String?         @db.Text
+  user       user            @relation(fields: [nim], references: [nim], onDelete: Cascade, map: "presensi_ibfk_1")
 
-  @@unique([id_user, jenis_presensi, tanggal])
+  @@index([nim], map: "nim")
+  @@index([nim, tanggal, sesi], map: "presensi_nim_tanggal_sesi")
+  @@index([tanggal], map: "presensi_tanggal")
 }
 
-model Izin {
-  id           Int        @id @default(autoincrement())
-  id_user      Int
-  user         User       @relation("PenghuniIzin", fields: [id_user], references: [id])
-  tanggal_izin DateTime   @db.Date
-  alasan       String
-  file_bukti   String
-  status_izin  StatusIzin @default(pending)
-  approved_by  Int?
-  fasil        User?      @relation("FasilIzin", fields: [approved_by], references: [id])
-  created_at   DateTime   @default(now())
+model user {
+  nim       String      @id @db.VarChar(20)
+  nama      String      @db.VarChar(100)
+  asal      String?     @db.VarChar(100)
+  jekel     user_jekel?
+  email     String      @unique(map: "email") @db.VarChar(100)
+  password  String      @db.VarChar(255)
+  telepon   String?     @db.VarChar(20)
+  kamar_id  Int?
+  fasil_id  String?     @db.VarChar(20)
+  gedung_id Int?
+  role      user_role   @default(penghuni)
+  aktif     Boolean     @default(true)
+  izin      izin[]
+  presensi  presensi[]
+  kamar     kamar?      @relation(fields: [kamar_id], references: [id], map: "user_ibfk_1")
+  fasil     user?       @relation("PenghuniFasil", fields: [fasil_id], references: [nim], map: "user_ibfk_fasil")
+  penghuni  user[]      @relation("PenghuniFasil")
+  gedung    gedung?     @relation("FasilGedung", fields: [gedung_id], references: [id], map: "user_ibfk_gedung")
+
+  @@index([kamar_id], map: "kamar_id")
+  @@index([fasil_id], map: "fasil_id")
+  @@index([gedung_id], map: "gedung_id")
+}
+
+enum user_jekel {
+  L
+  P
+}
+
+enum presensi_sesi {
+  subuh
+  malam
+}
+
+enum presensi_status {
+  hadir
+  izin
+  alpa
+  terlambat
+}
+
+enum user_role {
+  admin
+  fasil
+  penghuni
 }

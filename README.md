@@ -36,3 +36,9 @@ Tugas Akhir Mata Kuliah **Pengembangan Aplikasi Berbasis Framework**. REST API B
 Login memakai nilai `nim_nip` atau `email` dan password yang tersimpan sebagai hash bcrypt. Endpoint aplikasi dilayani dari origin yang sama; data presensi dan izin hanya dapat dibaca sesuai role akun yang login.
 
 Jika tabel `user` masih kosong, isi `ADMIN_NIMS` dengan NIM admin yang sama seperti `INITIAL_ADMIN_NIM`, lalu isi nama, email, dan password bootstrap di `.env`. Jalankan `npm run bootstrap:admin` satu kali. Script menolak berjalan jika tabel `user` sudah berisi akun. Hapus `INITIAL_ADMIN_PASSWORD` dari `.env` setelah bootstrap; daftar `ADMIN_NIMS` tetap diperlukan karena ERD tidak menyimpan role.
+## Frontend React
+
+- Dev: jalankan `npm run dev` (API :3000) dan `npm run dev:frontend` (Vite :5173, proxy ke API).
+- Produksi: `npm run install:frontend` lalu `npm run build:frontend`; Koa otomatis menyajikan `frontend/dist` (fallback ke `public` bila belum di-build).
+- Migrasi baru: `npx prisma migrate deploy`.
+- Koreksi status oleh fasil dapat dimatikan dengan `FASIL_KOREKSI_ENABLED=false` di .env (menunggu persetujuan dosen).
