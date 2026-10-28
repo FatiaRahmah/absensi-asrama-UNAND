@@ -37,19 +37,20 @@ app.use(async (ctx, next) => {
   ctx.set('X-Content-Type-Options', 'nosniff');
   ctx.body = fs.createReadStream(requestedPath);
 });
-// Frontend React (hasil `npm run build:frontend`); jika belum di-build, pakai UI lama di /public.
+// Frontend React harus di-build sebelum server dijalankan.
 const reactDist = path.join(__dirname, '../frontend/dist');
-const hasReactBuild = fs.existsSync(path.join(reactDist, 'index.html'));
-app.use(serve(hasReactBuild ? reactDist : path.join(__dirname, '../public')));
-if (hasReactBuild) {
-  app.use(async (ctx, next) => {
-    await next();
-    if (ctx.status === 404 && ctx.method === 'GET' && !ctx.path.startsWith('/api')) {
-      ctx.type = 'html';
-      ctx.body = fs.createReadStream(path.join(reactDist, 'index.html'));
-    }
-  });
+const reactIndex = path.join(reactDist, 'index.html');
+if (!fs.existsSync(reactIndex)) {
+  throw new Error('React frontend build not found. Run "npm run build" before starting the server.');
 }
+app.use(serve(reactDist));
+app.use(async (ctx, next) => {
+  await next();
+  if (ctx.status === 404 && ctx.method === 'GET' && !ctx.path.startsWith('/api')) {
+    ctx.type = 'html';
+    ctx.body = fs.createReadStream(reactIndex);
+  }
+});
 
 async function testConnection() {
   try {
