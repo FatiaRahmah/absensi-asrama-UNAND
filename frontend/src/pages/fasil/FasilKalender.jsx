@@ -28,6 +28,7 @@ export default function FasilKalender() {
   const bulan = /^\d{4}-\d{2}$/.test(params.get('bulan') || '') ? params.get('bulan') : `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
   const { data, loading, error, reload } = useFetch(() => api.get(`/binaan/${nim}/kalender`, { bulan }), [nim, bulan]);
   const [edit, setEdit] = useState(null);
+  const [izinFilter, setIzinFilter] = useState({ from: '', to: '' });
 
   if (loading && !data) return <Loading />;
   if (error) return <ErrorBox message={error} onRetry={reload} />;
@@ -36,6 +37,10 @@ export default function FasilKalender() {
   const daysInMonth = new Date(y, m, 0).getDate();
   const offset = (new Date(y, m - 1, 1).getDay() + 6) % 7;
   const cells = [...Array(offset).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
+  const izinList = data.izin.filter(i => {
+    const t = String(i.tanggal).slice(0, 10);
+    return (!izinFilter.from || t >= izinFilter.from) && (!izinFilter.to || t <= izinFilter.to);
+  });
 
   return (
     <>
@@ -83,12 +88,22 @@ export default function FasilKalender() {
 
       <div className="card">
         <h3>Riwayat Izin Binaan</h3>
-        {!data.izin.length ? <Empty>Belum ada pengajuan izin.</Empty> : (
+        <div className="filter-bar">
+          <label className="form-group"><span className="form-label">Dari tanggal</span>
+            <input type="date" className="form-input" value={izinFilter.from} max={izinFilter.to || undefined}
+              onChange={e => setIzinFilter({ ...izinFilter, from: e.target.value })} /></label>
+          <label className="form-group"><span className="form-label">Sampai tanggal</span>
+            <input type="date" className="form-input" value={izinFilter.to} min={izinFilter.from || undefined}
+              onChange={e => setIzinFilter({ ...izinFilter, to: e.target.value })} /></label>
+          <button className="btn btn-outline" disabled={!izinFilter.from && !izinFilter.to}
+            onClick={() => setIzinFilter({ from: '', to: '' })}>Reset</button>
+        </div>
+        {!data.izin.length ? <Empty>Belum ada pengajuan izin.</Empty> : !izinList.length ? <Empty>Tidak ada izin pada rentang tanggal ini.</Empty> : (
           <div className="table-wrap">
             <table className="table">
               <thead><tr><th>Tanggal Izin</th><th>Diajukan</th><th>Alasan</th><th>Bukti</th><th>Status</th></tr></thead>
               <tbody>
-                {data.izin.map(i => (
+                {izinList.map(i => (
                   <tr key={i.id}>
                     <td>{fmtDate(i.tanggal)}</td><td className="muted small">{i.diajukan}</td>
                     <td className="small">{i.alasan}</td>

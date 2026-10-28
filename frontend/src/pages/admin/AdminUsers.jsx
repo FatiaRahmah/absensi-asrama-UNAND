@@ -16,7 +16,6 @@ export default function AdminUsers() {
   const [roleFilter, setRoleFilter] = useState('');
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState(null); // null | 'new' | user
-  const [confirmDel, setConfirmDel] = useState(null);
 
   const list = users.data?.users || [];
   const binaanCount = useMemo(() => {
@@ -36,15 +35,6 @@ export default function AdminUsers() {
     try {
       await api.put(`/users/${u.nim_nip}`, { aktif: !u.aktif });
       toast(u.aktif ? 'Akun dinonaktifkan.' : 'Akun diaktifkan.');
-      users.reload();
-    } catch (err) { toast(err.message, 'error'); }
-  };
-
-  const remove = async () => {
-    try {
-      await api.del(`/users/${confirmDel.nim_nip}`);
-      toast('Pengguna dihapus.');
-      setConfirmDel(null);
       users.reload();
     } catch (err) { toast(err.message, 'error'); }
   };
@@ -91,7 +81,6 @@ export default function AdminUsers() {
                         <td className="num actions">
                           <button className="btn btn-outline btn-sm" onClick={() => setEditing(u)}>Edit</button>
                           <button className="btn btn-outline btn-sm" onClick={() => toggleActive(u)}>{u.aktif ? 'Nonaktifkan' : 'Aktifkan'}</button>
-                          <button className="btn btn-danger btn-sm" onClick={() => setConfirmDel(u)}>Hapus</button>
                         </td>
                       </tr>
                     ))}
@@ -108,17 +97,6 @@ export default function AdminUsers() {
         <UserForm user={editing === 'new' ? null : editing} gedungs={gedung.data?.gedungs || []}
           fasils={list.filter(u => u.role === 'fasil' && u.aktif)}
           onClose={() => setEditing(null)} onSaved={() => { setEditing(null); reloadAll(); }} />
-      )}
-
-      {confirmDel && (
-        <Modal title="Hapus pengguna?" onClose={() => setConfirmDel(null)}>
-          <p>Akun <strong>{confirmDel.nama}</strong> ({confirmDel.nim_nip}) beserta seluruh riwayat presensi dan izinnya akan dihapus permanen.
-            Untuk menjaga riwayat, pertimbangkan <em>Nonaktifkan</em>.</p>
-          <div className="btn-row">
-            <button className="btn btn-outline" onClick={() => setConfirmDel(null)}>Batal</button>
-            <button className="btn btn-danger grow" onClick={remove}>Ya, hapus permanen</button>
-          </div>
-        </Modal>
       )}
     </>
   );

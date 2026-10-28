@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../auth.jsx';
+import { Modal } from './ui.jsx';
 
 const Logo = ({ size = 38 }) => (
   <svg width={size} height={size} viewBox="0 0 100 100" fill="none" aria-hidden="true">
@@ -43,6 +45,7 @@ const NAV = {
 
 export default function Layout() {
   const { user, logout } = useAuth();
+  const [confirmLogout, setConfirmLogout] = useState(false);
   return (
     <div className="app-container">
       <aside className="sidebar">
@@ -85,13 +88,22 @@ export default function Layout() {
               <span className="user-name">{user.name}</span>
               <span className="user-role">{user.roleTitle} • {user.nim}</span>
             </div>
-            <button className="btn btn-outline btn-sm" onClick={logout}>Keluar ↵</button>
+            <button className="btn btn-outline btn-sm" onClick={() => setConfirmLogout(true)}>Keluar ↵</button>
           </div>
         </header>
         <main className="content-body">
           <Outlet />
         </main>
       </div>
+      {confirmLogout && (
+        <Modal title="Konfirmasi Keluar" onClose={() => setConfirmLogout(false)}>
+          <p>Apakah Anda yakin ingin keluar dari akun <strong>{user.name}</strong>?</p>
+          <div className="btn-row">
+            <button type="button" className="btn btn-outline" onClick={() => setConfirmLogout(false)}>Batal</button>
+            <button type="button" className="btn btn-primary grow" autoFocus onClick={logout}>Ya, Keluar</button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

@@ -45,11 +45,19 @@ function focusSession(now = new Date()) {
  * Membuat catatan "alpa" otomatis untuk penghuni aktif yang tidak presensi dan tidak
  * punya izin pada sesi hari ini yang sudah berakhir. Aman dijalankan berulang (idempoten).
  */
-async function ensureAlpa(now = new Date()) {
-	const today = toDateKey(now);
+async function ensureAlpa(now = new Date(), backfillDays = 1) {
+	const todayKeyNow = toDateKey(now);
+	// Hari-hari sebelumnya: semua sesi sudah pasti berakhir (menutup celah saat server mati).
+	for (let i = backfillDays; i >= 1; i--) {
+		await insertAlpa(addDays(todayKeyNow, -i), Object.keys(SESI));
+	}
 	const minutes = minutesOf(now);
-	for (const [key, s] of Object.entries(SESI)) {
-		if (minutes <= s.end) continue;
+	await insertAlpa(todayKeyNow, Object.entries(SESI).filter(([, s]) => minutes > s.end).map(([k]) => k));
+}
+
+async function insertAlpa(today, sesiKeys) {
+	for (const key of sesiKeys) {
+		const s = SESI[key];
 		await prisma.$executeRawUnsafe(
 			`INSERT INTO presensi (nim, tanggal, jam, waktu, status, sesi, keterangan)
 			 SELECT u.nim, ?, ?, ?, 'alpa', ?, 'Otomatis: tidak melakukan presensi'

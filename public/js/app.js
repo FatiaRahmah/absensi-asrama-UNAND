@@ -87,7 +87,9 @@ const App = {
     // Logout button handler
     const btnLogout = document.getElementById('btn-logout-header');
     if (btnLogout) {
-      btnLogout.addEventListener('click', () => this.logout());
+      btnLogout.addEventListener('click', () => {
+        if (confirm('Apakah Anda yakin ingin keluar?')) this.logout();
+      });
     }
   },
 

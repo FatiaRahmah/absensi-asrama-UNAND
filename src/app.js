@@ -62,10 +62,7 @@ async function testConnection() {
 
 testConnection();
 
-const { ensureAlpa } = require('./utils/attendance');
-const runAutoAlpa = () => ensureAlpa().catch(err => console.error('Auto-alpa gagal:', err.message));
-runAutoAlpa();
-setInterval(runAutoAlpa, 60 * 1000);
+require('./jobs/autoAlpa').startAutoAlpa();
 
 app.listen(PORT, () => {
   console.log(`🚀 Server Koa berjalan di http://localhost:${PORT}`);
