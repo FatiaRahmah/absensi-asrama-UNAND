@@ -114,8 +114,12 @@ function RekapTab({ filters, mode, update }) {
     [[mode === 'gedung' ? 'Gedung' : mode === 'fasil' ? 'Fasil' : 'Penghuni', 'Keterangan', 'Hadir', 'Izin', 'Alpa', '% Hadir']].concat(
       data.rows.map(r => [r.nama, r.sub, r.hadir, r.izin, r.alpa, `${r.persen}%`])));
 
-  const open = row => update({ tab: 'riwayat', page: '', ...(row.filter.gedung_id ? { gedung_id: row.filter.gedung_id } : {}),
-    ...(row.filter.fasil_id ? { fasil_id: row.filter.fasil_id } : {}), ...(row.filter.q ? { q: row.filter.q } : {}) });
+  // Gedung/Fasil → daftar penghuni (sesuai gedung/fasil); Penghuni → riwayat absensi penghuni tsb.
+  const open = row => {
+    if (mode === 'penghuni') return update({ tab: 'riwayat', page: '', q: row.key });
+    update({ mode: 'penghuni', gedung_id: row.filter.gedung_id || '', kamar_id: '', fasil_id: row.filter.fasil_id || '' });
+  };
+  const gedungNama = filters.gedung_id && data?.rows[0]?.sub?.split(' • ')[1]?.split(' / ')[0];
 
   return (
     <div className="card">
@@ -125,7 +129,13 @@ function RekapTab({ filters, mode, update }) {
         </div>
         <button className="btn btn-outline" disabled={!data?.rows.length} onClick={exportCsv}>📥 Ekspor CSV</button>
       </div>
-      <p className="muted small">Periode {fmtDate(filters.from)} – {fmtDate(filters.to)} • klik baris untuk membuka riwayat detail dengan filter terisi.</p>
+      {mode === 'penghuni' && (filters.gedung_id || filters.fasil_id) && (
+        <div className="section-head">
+          <strong>Penghuni {gedungNama ? `Gedung ${gedungNama}` : 'terfilter'}</strong>
+          <button className="btn btn-outline btn-sm" onClick={() => update({ mode: filters.fasil_id && !filters.gedung_id ? 'fasil' : 'gedung', gedung_id: '', kamar_id: '', fasil_id: '' })}>← Kembali</button>
+        </div>
+      )}
+      <p className="muted small">Periode {fmtDate(filters.from)} – {fmtDate(filters.to)} • {mode === 'penghuni' ? 'klik nama penghuni untuk melihat riwayat absensinya.' : 'klik baris untuk melihat daftar penghuni.'}</p>
       {loading && !data ? <Loading /> : error ? <ErrorBox message={error} onRetry={reload} /> : !data.rows.length ? <Empty>Tidak ada data.</Empty> : (
         <div className="table-wrap">
           <table className="table clickable">
@@ -170,7 +180,10 @@ function RiwayatTab({ filters, page, update }) {
   return (
     <div className="card">
       <div className="section-head">
-        <span className="muted small">{data ? `${data.total} catatan` : ''}</span>
+        <span className="muted small">
+          {filters.q && <button className="btn btn-outline btn-sm" style={{ marginRight: 8 }} onClick={() => update({ tab: 'rekap', mode: 'penghuni', q: '', page: '' })}>← Kembali ke daftar penghuni</button>}
+          {data ? `${data.total} catatan` : ''}
+        </span>
         <div className="page-actions">
           <select className="form-select" value={perPage} onChange={e => { setPerPage(Number(e.target.value)); update({ page: '' }); }}>
             {[20, 30, 50].map(n => <option key={n} value={n}>{n} / halaman</option>)}
