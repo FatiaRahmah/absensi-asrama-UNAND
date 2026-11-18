@@ -1,4 +1,5 @@
 const prisma = require('../config/database');
+const ExcelJS = require('exceljs');
 const { ASRAMA_LOCATIONS, haversineDistance } = require('../utils/geoCheck');
 const {
 	SESI, num, toDateKey, todayKey, addDays, percent, sessionStatus, focusSession, ensureAlpa
@@ -16,13 +17,48 @@ function monthRange(dateKey) {
 
 const isDateKey = value => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
 
-function csvEscape(value) {
-	const text = value === null || value === undefined ? '' : String(value);
-	return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-}
-
 function zeroCounts() {
 	return { hadir: 0, izin: 0, alpa: 0, belum: 0, total: 0, persen: 0 };
+}
+
+function attendancePercent(hadir, izin, alpa) {
+	const total = num(hadir) + num(izin) + num(alpa);
+	return percent(num(hadir), total);
+}
+
+async function sendExcel(ctx, filename, sheetName, headers, rows) {
+	const workbook = new ExcelJS.Workbook();
+	workbook.creator = 'Portal Asrama UNAND';
+	const worksheet = workbook.addWorksheet(sheetName, { views: [{ state: 'frozen', ySplit: 1 }] });
+	worksheet.columns = headers.map((header, index) => {
+		const width = rows.reduce((max, row) => Math.max(max, String(row[index] ?? '').length), header.length);
+		return { header, key: `column${index + 1}`, width: Math.min(48, Math.max(12, width + 2)) };
+	});
+	rows.forEach(row => worksheet.addRow(row));
+	worksheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: headers.length } };
+	const headerRow = worksheet.getRow(1);
+	headerRow.height = 30;
+	headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+	headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0B7A48' } };
+	headerRow.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+	worksheet.eachRow((row, rowNumber) => {
+		if (rowNumber > 1) {
+			row.alignment = { vertical: 'middle' };
+			if (rowNumber % 2 === 0) row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F7F4' } };
+			row.eachCell((cell, columnNumber) => {
+				if (typeof cell.value === 'number') {
+					const columnName = headers[columnNumber - 1].toLowerCase();
+					cell.numFmt = columnName.includes('persentase') ? '0.0"%"'
+						: columnName.includes('latitude') || columnName.includes('longitude') ? '0.000000' : '#,##0';
+					cell.alignment = { horizontal: 'right', vertical: 'middle' };
+				}
+			});
+		}
+	});
+	const buffer = await workbook.xlsx.writeBuffer();
+	ctx.set('Content-Disposition', `attachment; filename="${filename}"`);
+	ctx.type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+	ctx.body = Buffer.from(buffer);
 }
 
 /** Hitung kartu hari ini per sesi untuk sekelompok penghuni (semua / binaan). */
@@ -193,17 +229,14 @@ async function fasilDashboard(ctx) {
 	perhatian.sort((a, b) => b.alpaMinggu - a.alpaMinggu || b.berturut - a.berturut);
 
 	const month = monthRange(today);
-	const monthRows = await query(
-		`SELECT p.status, COUNT(*) AS c FROM presensi p JOIN \`user\` u ON u.nim = p.nim
-		 WHERE u.fasil_id = ? AND u.role = 'penghuni' AND p.tanggal BETWEEN ? AND ? GROUP BY p.status`,
+	const [monthRow] = await query(
+		`SELECT COALESCE(SUM(${HADIR_SQL}), 0) AS hadir,
+			COALESCE(SUM(p.status = 'izin'), 0) AS izin, COALESCE(SUM(p.status = 'alpa'), 0) AS alpa
+		 FROM presensi p JOIN \`user\` u ON u.nim = p.nim
+		 WHERE u.fasil_id = ? AND u.role = 'penghuni' AND p.tanggal BETWEEN ? AND ?`,
 		me, month.from, today
 	);
-	const bulan = { hadir: 0, izin: 0, alpa: 0 };
-	for (const row of monthRows) {
-		if (row.status === 'izin') bulan.izin += num(row.c);
-		else if (row.status === 'alpa') bulan.alpa += num(row.c);
-		else bulan.hadir += num(row.c);
-	}
+	const bulan = { hadir: num(monthRow.hadir), izin: num(monthRow.izin), alpa: num(monthRow.alpa) };
 	const bulanTotal = bulan.hadir + bulan.izin + bulan.alpa;
 
 	ctx.body = {
@@ -215,7 +248,7 @@ async function fasilDashboard(ctx) {
 		belumAbsen,
 		izinPending: { total: pendingTotal, daftar: izinPending },
 		perhatian,
-		bulanIni: { ...bulan, total: bulanTotal, persen: percent(bulan.hadir, bulanTotal) }
+		bulanIni: { ...bulan, total: bulanTotal, persen: attendancePercent(bulan.hadir, bulan.izin, bulan.alpa) }
 	};
 }
 
@@ -243,6 +276,15 @@ async function rekap(ctx) {
 		if (q.gedung_id) { where += ' AND g.id = ?'; whereParams.push(Number(q.gedung_id)); }
 		if (q.kamar_id) { where += ' AND k.id = ?'; whereParams.push(Number(q.kamar_id)); }
 		if (q.fasil_id) { where += ' AND u.fasil_id = ?'; whereParams.push(String(q.fasil_id)); }
+	}
+	const keyword = String(q.q || '').trim();
+	if (keyword) {
+		const match = `%${keyword.toLowerCase()}%`;
+		where += user.role === 'fasil'
+			? ' AND (LOWER(u.nama) LIKE ? OR LOWER(u.nim) LIKE ?)'
+			: ' AND (LOWER(u.nama) LIKE ? OR LOWER(u.nim) LIKE ? OR LOWER(f.nama) LIKE ? OR LOWER(f.nim) LIKE ? OR LOWER(g.nama) LIKE ?)';
+		whereParams.push(match, match);
+		if (user.role !== 'fasil') whereParams.push(match, match, match);
 	}
 
 	const rows = await query(
@@ -282,10 +324,21 @@ async function rekap(ctx) {
 	}
 	const data = [...groups.values()].map(g => {
 		const total = g.hadir + g.izin + g.alpa;
-		return { ...g, total, persen: percent(g.hadir, total) };
+		return { ...g, total, persen: attendancePercent(g.hadir, g.izin, g.alpa) };
 	});
 	data.sort((a, b) => a.nama.localeCompare(b.nama));
 	ctx.body = { mode, from, to, sesi, rows: data };
+}
+
+async function rekapExport(ctx) {
+	await rekap(ctx);
+	const { mode, from, to, rows } = ctx.body;
+	const header = [
+		mode === 'gedung' ? 'Gedung' : mode === 'fasil' ? 'Fasil' : 'Nama Penghuni',
+		'Keterangan', 'Jumlah Hadir (termasuk terlambat)', 'Izin', 'Alpa', 'Persentase Hadir (%)'
+	];
+	const dataRows = rows.map(r => [r.nama, r.sub, r.hadir, r.izin, r.alpa, r.persen]);
+	await sendExcel(ctx, `rekap-${mode}.xlsx`, `Rekap ${mode}`, header, dataRows);
 }
 
 /* ----------------------------- RIWAYAT ----------------------------- */
@@ -302,8 +355,14 @@ function riwayatQuery(q) {
 	if (SESI[q.sesi]) { where += ' AND p.sesi = ?'; params.push(q.sesi); }
 	if (['hadir', 'izin', 'alpa', 'terlambat'].includes(q.status)) { where += ' AND p.status = ?'; params.push(q.status); }
 	if (q.q && String(q.q).trim()) {
-		where += ' AND (u.nama LIKE ? OR u.nim LIKE ?)';
-		params.push(`%${String(q.q).trim()}%`, `%${String(q.q).trim()}%`);
+		const keyword = `%${String(q.q).trim().toLowerCase()}%`;
+		where += ' AND (LOWER(u.nama) LIKE ? OR LOWER(u.nim) LIKE ?)';
+		params.push(keyword, keyword);
+	}
+	if (q.fasil_q && String(q.fasil_q).trim()) {
+		const keyword = `%${String(q.fasil_q).trim().toLowerCase()}%`;
+		where += ' AND (LOWER(f.nama) LIKE ? OR LOWER(f.nim) LIKE ?)';
+		params.push(keyword, keyword);
 	}
 	const base = `FROM presensi p
 		JOIN \`user\` u ON u.nim = p.nim
@@ -348,13 +407,13 @@ async function riwayat(ctx) {
 async function riwayatExport(ctx) {
 	const { base, params } = riwayatQuery(ctx.query);
 	const rows = (await query(`SELECT ${RIWAYAT_COLUMNS} ${base} ${RIWAYAT_ORDER} LIMIT 20000`, ...params)).map(mapRiwayat);
-	const header = ['Tanggal', 'Jam', 'NIM', 'Nama', 'Gedung', 'Kamar', 'Sesi', 'Status', 'Latitude', 'Longitude', 'Jarak (m)', 'Fasil', 'Keterangan'];
-	const lines = [header.join(',')].concat(rows.map(r => [
-		r.tanggal, r.jam, r.nim, r.nama, r.gedung, r.kamar, r.sesi, r.status, r.lat, r.lng, r.jarak, r.fasil, r.keterangan
-	].map(csvEscape).join(',')));
-	ctx.set('Content-Disposition', 'attachment; filename="riwayat-presensi.csv"');
-	ctx.type = 'text/csv; charset=utf-8';
-	ctx.body = `\uFEFF${lines.join('\r\n')}`;
+	const header = ['Tanggal', 'Jam', 'NIM', 'Nama Penghuni', 'Gedung', 'Kamar', 'Sesi', 'Status', 'Latitude', 'Longitude', 'Jarak (m)', 'Nama Fasil', 'Keterangan'];
+	const dataRows = rows.map(r => [
+		r.tanggal, r.jam, r.nim, r.nama, r.gedung, r.kamar, r.sesi === 'subuh' ? 'Subuh' : 'Malam',
+		({ hadir: 'Hadir', terlambat: 'Terlambat', izin: 'Izin', alpa: 'Alpa' })[r.status] || r.status,
+		r.lat, r.lng, r.jarak, r.fasil, r.keterangan
+	]);
+	await sendExcel(ctx, 'riwayat-presensi.xlsx', 'Riwayat Presensi', header, dataRows);
 }
 
 /* ------------------------- KALENDER BINAAN ------------------------- */
@@ -382,7 +441,7 @@ async function kalenderBinaan(ctx) {
 		hari[row.tanggal][row.sesi] = { id: row.id, status: row.status, keterangan: row.keterangan };
 		if (row.status === 'izin') ringkasan.izin++;
 		else if (row.status === 'alpa') ringkasan.alpa++;
-		else ringkasan.hadir++;
+		else if (row.status === 'hadir' || row.status === 'terlambat') ringkasan.hadir++;
 	}
 	const izin = await query(
 		`SELECT id, DATE_FORMAT(tanggal, '%Y-%m-%d') AS tanggal, alasan, file_bukti, status_izin,
@@ -397,4 +456,24 @@ async function kalenderBinaan(ctx) {
 	};
 }
 
-module.exports = { adminDashboard, fasilDashboard, rekap, riwayat, riwayatExport, kalenderBinaan };
+async function kalenderBinaanExport(ctx) {
+	await kalenderBinaan(ctx);
+	const { bulan, hari, penghuni } = ctx.body;
+	const header = ['Tanggal', 'Nama Penghuni', 'NIM', 'Sesi', 'Status', 'Keterangan'];
+	const dataRows = [];
+	Object.entries(hari).sort(([a], [b]) => a.localeCompare(b)).forEach(([tanggal, sesiData]) => {
+		['subuh', 'malam'].forEach(sesi => {
+			const record = sesiData[sesi];
+			if (record) {
+				const status = ({ hadir: 'Hadir', terlambat: 'Terlambat', izin: 'Izin', alpa: 'Alpa' })[record.status] || record.status;
+				dataRows.push([tanggal, penghuni.nama, penghuni.nim, SESI[sesi].label, status, record.keterangan || '']);
+			}
+		});
+	});
+	await sendExcel(ctx, `riwayat-binaan-${bulan}.xlsx`, 'Riwayat Presensi', header, dataRows);
+}
+
+module.exports = {
+	adminDashboard, fasilDashboard, rekap, rekapExport, riwayat, riwayatExport,
+	kalenderBinaan, kalenderBinaanExport
+};

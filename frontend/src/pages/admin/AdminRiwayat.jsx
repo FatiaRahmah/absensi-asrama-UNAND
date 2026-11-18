@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../../api.js';
 import { Empty, ErrorBox, Loading, Modal, PageHeader, StatusPill, useFetch, useToast } from '../../components/ui.jsx';
-import { SESI_LABEL, downloadCsv, fmtDate, mapsUrl, monthEnd, monthStart } from '../../utils.js';
+import { SESI_LABEL, fmtDate, mapsUrl, monthEnd, monthStart } from '../../utils.js';
 
-const FILTER_KEYS = ['from', 'to', 'gedung_id', 'kamar_id', 'sesi', 'fasil_id', 'q', 'status'];
+const FILTER_KEYS = ['from', 'to', 'gedung_id', 'kamar_id', 'sesi', 'fasil_id', 'q', 'fasil_q', 'status'];
 
 function useFilters() {
   const [params, setParams] = useSearchParams();
@@ -49,16 +49,22 @@ function FilterBar({ filters, gedungs, fasils, onApply, showMode, mode, riwayat 
           <option value="">Semua sesi</option><option value="subuh">Subuh</option><option value="malam">Malam</option>
         </select></label>
       {!riwayat && (
-        <label className="form-group"><span className="form-label">Fasil</span>
-          <select className="form-select" value={draft.fasil_id || ''} onChange={e => set('fasil_id', e.target.value)}>
-            <option value="">Semua fasil</option>
-            {fasils.map(f => <option key={f.nim_nip} value={f.nim_nip}>{f.nama}</option>)}
-          </select></label>
+        <>
+          <label className="form-group"><span className="form-label">Cari data terkait</span>
+            <input className="form-input" value={draft.q || ''} placeholder="Nama atau NIM..." onChange={e => set('q', e.target.value)} /></label>
+          <label className="form-group"><span className="form-label">Fasil</span>
+            <select className="form-select" value={draft.fasil_id || ''} onChange={e => set('fasil_id', e.target.value)}>
+              <option value="">Semua fasil</option>
+              {fasils.map(f => <option key={f.nim_nip} value={f.nim_nip}>{f.nama}</option>)}
+            </select></label>
+        </>
       )}
       {riwayat && (
         <>
           <label className="form-group"><span className="form-label">Penghuni (nama / NIM)</span>
             <input className="form-input" value={draft.q || ''} placeholder="Cari..." onChange={e => set('q', e.target.value)} /></label>
+          <label className="form-group"><span className="form-label">Fasil (nama)</span>
+            <input className="form-input" value={draft.fasil_q || ''} placeholder="Cari fasil..." onChange={e => set('fasil_q', e.target.value)} /></label>
           <label className="form-group"><span className="form-label">Status</span>
             <select className="form-select" value={draft.status || ''} onChange={e => set('status', e.target.value)}>
               <option value="">Semua status</option><option value="hadir">Hadir</option><option value="terlambat">Terlambat</option>
@@ -105,14 +111,19 @@ export default function AdminRiwayat() {
 }
 
 function RekapTab({ filters, mode, update }) {
+  const toast = useToast();
   const query = { ...filters, mode };
-  delete query.q; delete query.status;
+  delete query.status;
   const { data, loading, error, reload } = useFetch(() => api.get('/rekap', query), [JSON.stringify(query)]);
   const modes = [['gedung', 'Per Gedung'], ['penghuni', 'Per Penghuni'], ['fasil', 'Per Fasil']];
 
-  const exportCsv = () => downloadCsv(`rekap-${mode}_${filters.from}_${filters.to}.csv`,
-    [[mode === 'gedung' ? 'Gedung' : mode === 'fasil' ? 'Fasil' : 'Penghuni', 'Keterangan', 'Hadir', 'Izin', 'Alpa', '% Hadir']].concat(
-      data.rows.map(r => [r.nama, r.sub, r.hadir, r.izin, r.alpa, `${r.persen}%`])));
+  const exportExcel = async () => {
+    try {
+      await api.download('/rekap/export', query, `rekap-${mode}_${filters.from}_${filters.to}.xlsx`);
+    } catch (err) {
+      toast(err.message || 'Gagal membuat berkas Excel.', 'error');
+    }
+  };
 
   // Gedung/Fasil → daftar penghuni (sesuai gedung/fasil); Penghuni → riwayat absensi penghuni tsb.
   const open = row => {
@@ -127,7 +138,7 @@ function RekapTab({ filters, mode, update }) {
         <div className="tabs compact">
           {modes.map(([k, label]) => <button key={k} className={`tab ${mode === k ? 'active' : ''}`} onClick={() => update({ mode: k })}>{label}</button>)}
         </div>
-        <button className="btn btn-outline" disabled={!data?.rows.length} onClick={exportCsv}>📥 Ekspor CSV</button>
+        <button className="btn btn-outline" disabled={!data?.rows.length} onClick={exportExcel}>📥 Ekspor Excel</button>
       </div>
       {mode === 'penghuni' && (filters.gedung_id || filters.fasil_id) && (
         <div className="section-head">
@@ -168,8 +179,8 @@ function RiwayatTab({ filters, page, update }) {
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.perPage)) : 1;
 
-  const exportCsv = async () => {
-    try { await api.download('/riwayat/export', filters, `riwayat-presensi_${filters.from}_${filters.to}.csv`); }
+  const exportExcel = async () => {
+    try { await api.download('/riwayat/export', filters, `riwayat-presensi_${filters.from}_${filters.to}.xlsx`); }
     catch (err) { toast(err.message, 'error'); }
   };
   const doDelete = async () => {
@@ -188,7 +199,7 @@ function RiwayatTab({ filters, page, update }) {
           <select className="form-select" value={perPage} onChange={e => { setPerPage(Number(e.target.value)); update({ page: '' }); }}>
             {[20, 30, 50].map(n => <option key={n} value={n}>{n} / halaman</option>)}
           </select>
-          <button className="btn btn-outline" onClick={exportCsv}>📥 Ekspor CSV (sesuai filter)</button>
+          <button className="btn btn-outline" onClick={exportExcel}>📥 Ekspor Excel (sesuai filter)</button>
         </div>
       </div>
       {loading && !data ? <Loading /> : error ? <ErrorBox message={error} onRetry={reload} /> : !data.rows.length ? <Empty>Tidak ada riwayat untuk filter ini.</Empty> : (

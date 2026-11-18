@@ -41,8 +41,10 @@ router.patch('/izin/:id/status', authenticate, allowRoles('fasil', 'admin'), izi
 router.get('/dashboard/admin', authenticate, allowRoles('admin'), reportController.adminDashboard);
 router.get('/dashboard/fasil', authenticate, allowRoles('fasil'), reportController.fasilDashboard);
 router.get('/rekap', authenticate, allowRoles('admin', 'fasil'), reportController.rekap);
+router.get('/rekap/export', authenticate, allowRoles('admin', 'fasil'), reportController.rekapExport);
 router.get('/riwayat', authenticate, allowRoles('admin'), reportController.riwayat);
 router.get('/riwayat/export', authenticate, allowRoles('admin'), reportController.riwayatExport);
 router.get('/binaan/:nim/kalender', authenticate, allowRoles('admin', 'fasil'), reportController.kalenderBinaan);
+router.get('/binaan/:nim/kalender/export', authenticate, allowRoles('admin', 'fasil'), reportController.kalenderBinaanExport);
 
 module.exports = router;

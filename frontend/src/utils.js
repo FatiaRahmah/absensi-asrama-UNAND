@@ -29,17 +29,3 @@ export function fmtMinutes(minutes) {
   const m = minutes % 60;
   return h > 0 ? `${h} jam ${m} menit` : `${m} menit`;
 }
-
-export function downloadCsv(filename, rows) {
-  const escape = v => {
-    const text = v === null || v === undefined ? '' : String(v);
-    return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-  };
-  const content = `\uFEFF${rows.map(r => r.map(escape).join(',')).join('\r\n')}`;
-  const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' }));
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(url);
-}

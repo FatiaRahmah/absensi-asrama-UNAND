@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { api } from '../../api.js';
-import { Empty, ErrorBox, Loading, Modal, PageHeader, StatusPill, useFetch, useToast } from '../../components/ui.jsx';
+import { Empty, ErrorBox, Loading, Modal, PageHeader, StatCard, StatusPill, useFetch, useToast } from '../../components/ui.jsx';
 import { MONTHS_LONG, fmtDate, pad } from '../../utils.js';
 
 const WEEKDAYS = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
@@ -41,10 +41,18 @@ export default function FasilKalender() {
     const t = String(i.tanggal).slice(0, 10);
     return (!izinFilter.from || t >= izinFilter.from) && (!izinFilter.to || t <= izinFilter.to);
   });
+  const exportExcel = async () => {
+    try {
+      await api.download(`/binaan/${nim}/kalender/export`, { bulan }, `riwayat-presensi_${data.penghuni.nim}_${bulan}.xlsx`);
+    } catch (err) {
+      toast(err.message || 'Gagal membuat berkas Excel.', 'error');
+    }
+  };
 
   return (
     <>
       <PageHeader title={data.penghuni.nama} subtitle={`Kalender kehadiran binaan • NIM ${data.penghuni.nim}`}>
+        <button className="btn btn-outline" disabled={!Object.keys(data.hari).length} onClick={exportExcel}>📥 Ekspor Excel</button>
         <Link className="btn btn-outline" to="/fasil/rekap">← Kembali ke rekap</Link>
       </PageHeader>
 
@@ -54,9 +62,10 @@ export default function FasilKalender() {
           <h3>{MONTHS_LONG[m - 1]} {y}</h3>
           <button className="btn btn-outline btn-sm" onClick={() => setParams({ bulan: shiftMonth(bulan, 1) })}>›</button>
         </div>
-        <div className="legend">
-          <span><i className="dot hadir" /> Hadir</span><span><i className="dot izin" /> Izin</span><span><i className="dot alpa" /> Alpa</span>
-          <span className="muted small">• Total bulan ini: {data.ringkasan.hadir} hadir, {data.ringkasan.izin} izin, {data.ringkasan.alpa} alpa</span>
+        <div className="stat-grid calendar-summary" aria-label="Ringkasan kehadiran bulan ini">
+          <StatCard label="Hadir" value={data.ringkasan.hadir} tone="green" hint="Presensi berhasil, termasuk terlambat." />
+          <StatCard label="Izin" value={data.ringkasan.izin} tone="amber" hint="Izin tercatat untuk sesi tersebut." />
+          <StatCard label="Alpa" value={data.ringkasan.alpa} tone="red" hint="Tidak hadir tanpa izin tercatat." />
         </div>
         <div className="calendar">
           {WEEKDAYS.map(d => <div key={d} className="cal-weekday">{d}</div>)}

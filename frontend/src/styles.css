@@ -143,6 +143,10 @@ button { font-family: inherit; }
 /* Calendar */
 .calendar-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; } .calendar-head h3 { margin: 0; font-size: 17px; }
 .legend { display: flex; gap: 16px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; } .dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; background: #cbd5e1; } .dot.hadir { background: #22c55e; } .dot.izin { background: #facc15; } .dot.alpa { background: #ef4444; }
+.calendar-summary { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin: 8px 0 12px; }
+.calendar-summary .stat-card { padding: 10px 12px; }
+.calendar-summary .stat-value { font-size: 22px; }
+.calendar-summary .stat-hint { font-size: 10.5px; line-height: 1.35; }
 .calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
 .cal-weekday { text-align: center; font-size: 11px; font-weight: 800; color: var(--muted); text-transform: uppercase; }
 .cal-cell { min-height: 92px; border: 1px solid var(--border); border-radius: 10px; padding: 6px; background: #fff; display: flex; flex-direction: column; gap: 3px; }
