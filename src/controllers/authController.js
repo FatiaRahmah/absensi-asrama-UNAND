@@ -26,7 +26,7 @@ async function login(ctx) {
 	const { identifier, password } = ctx.request.body || {};
 	if (!process.env.JWT_SECRET) ctx.throw(500, 'JWT_SECRET belum dikonfigurasi di file .env');
 	if (!identifier || !password) {
-		ctx.throw(400, 'NIM/NIP/email dan password wajib diisi');
+		ctx.throw(400, 'NIM dan password wajib diisi');
 	}
 
 	const users = await prisma.$queryRaw`
