@@ -181,6 +181,29 @@ const App = {
   /* Navigation handling */
   setupNavigation() {
     const navItems = document.querySelectorAll('.nav-item');
+    const sidebar = document.querySelector('.sidebar');
+    const backdrop = document.getElementById('sidebar-backdrop');
+    const menuToggle = document.getElementById('menu-toggle');
+    const sidebarClose = document.getElementById('sidebar-close');
+
+    const closeMenu = () => {
+      sidebar?.classList.remove('open');
+      backdrop?.classList.remove('open');
+      menuToggle?.setAttribute('aria-expanded', 'false');
+    };
+
+    const openMenu = () => {
+      sidebar?.classList.add('open');
+      backdrop?.classList.add('open');
+      menuToggle?.setAttribute('aria-expanded', 'true');
+    };
+
+    menuToggle?.addEventListener('click', openMenu);
+    sidebarClose?.addEventListener('click', closeMenu);
+    backdrop?.addEventListener('click', closeMenu);
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape') closeMenu();
+    });
 
     navItems.forEach(item => {
       item.addEventListener('click', (e) => {
@@ -188,6 +211,7 @@ const App = {
         const targetViewId = item.getAttribute('data-view');
         if (targetViewId) {
           this.navigateToView(targetViewId);
+          closeMenu();
         }
       });
     });

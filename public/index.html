@@ -2,7 +2,8 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0b7a48">
   <title>Portal Asrama Universitas Andalas - Sistem Presensi Digital Mahasiswa</title>
   <meta name="description" content="Sistem Informasi Presensi & Monitoring Terpadu Asrama Universitas Andalas (UNAND)">
   <link rel="stylesheet" href="css/style.css">
@@ -15,12 +16,7 @@
   <div class="login-screen-overlay" id="login-screen-overlay">
     <div class="login-card">
       <div class="login-brand">
-        <svg class="login-brand-logo" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect width="100" height="100" rx="20" fill="#0b7a48"/>
-          <path d="M50 15L80 32V68L50 85L20 68V32L50 15Z" fill="#ffffff" opacity="0.9"/>
-          <path d="M50 25L70 37V63L50 75L30 63V37L50 25Z" fill="#0b7a48"/>
-          <circle cx="50" cy="50" r="12" fill="#f59e0b"/>
-        </svg>
+        <img class="login-brand-logo" src="/logo-unand.png" alt="Logo Universitas Andalas" />
         <div>
           <h2>Portal Asrama UNAND</h2>
           <p>Sistem Presensi & Monitoring Terpadu</p>
@@ -54,22 +50,19 @@
        MAIN APP CONTAINER (RESTRICTED TO AUTHENTICATED USERS)
        ========================================== -->
   <div class="app-container" style="display: none;">
+    <button type="button" class="sidebar-backdrop" id="sidebar-backdrop" aria-label="Tutup menu"></button>
 
     <!-- SIDEBAR NAVIGATION -->
     <aside class="sidebar">
       <div class="sidebar-top">
         
         <div class="sidebar-brand">
-          <svg class="brand-logo-img" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect width="100" height="100" rx="20" fill="#0b7a48"/>
-            <path d="M50 15L80 32V68L50 85L20 68V32L50 15Z" fill="#ffffff" opacity="0.9"/>
-            <path d="M50 25L70 37V63L50 75L30 63V37L50 25Z" fill="#0b7a48"/>
-            <circle cx="50" cy="50" r="12" fill="#f59e0b"/>
-          </svg>
+          <img class="brand-logo-img" src="/logo-unand.png" alt="Logo Universitas Andalas" />
           <div class="brand-text">
             <h2>Portal Asrama</h2>
             <p>Universitas Andalas</p>
           </div>
+          <button type="button" class="sidebar-close" id="sidebar-close" aria-label="Tutup menu">×</button>
         </div>
 
         <div class="sidebar-subcard">
@@ -126,6 +119,11 @@
       
       <header class="top-header">
         <div class="top-header-left">
+          <button type="button" class="menu-toggle" id="menu-toggle" aria-label="Buka menu" aria-expanded="false">
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
           <span class="portal-tag">ASRAMA UNAND</span>
           <span class="header-subtitle">Sistem Informasi Presensi Digital Mahasiswa</span>
         </div>

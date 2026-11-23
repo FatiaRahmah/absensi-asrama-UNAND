@@ -1,15 +1,16 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../auth.jsx';
 import { Modal } from './ui.jsx';
 
 const Logo = ({ size = 38 }) => (
-  <svg width={size} height={size} viewBox="0 0 100 100" fill="none" aria-hidden="true">
-    <rect width="100" height="100" rx="20" fill="#0b7a48" />
-    <path d="M50 15L80 32V68L50 85L20 68V32L50 15Z" fill="#fff" opacity="0.9" />
-    <path d="M50 25L70 37V63L50 75L30 63V37L50 25Z" fill="#0b7a48" />
-    <circle cx="50" cy="50" r="12" fill="#f59e0b" />
-  </svg>
+  <img
+    src="/logo-unand.png"
+    width={size}
+    height={size}
+    alt="Logo Universitas Andalas"
+    className="unand-logo"
+  />
 );
 export { Logo };
 
@@ -46,9 +47,28 @@ const NAV = {
 export default function Layout() {
   const { user, logout } = useAuth();
   const [confirmLogout, setConfirmLogout] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const closeWithEscape = event => {
+      if (event.key === 'Escape') setMenuOpen(false);
+    };
+    window.addEventListener('keydown', closeWithEscape);
+    return () => window.removeEventListener('keydown', closeWithEscape);
+  }, [menuOpen]);
+
   return (
     <div className="app-container">
-      <aside className="sidebar">
+      {menuOpen && (
+        <button
+          type="button"
+          className="sidebar-backdrop"
+          aria-label="Tutup menu"
+          onClick={() => setMenuOpen(false)}
+        />
+      )}
+      <aside className={`sidebar ${menuOpen ? 'open' : ''}`} aria-hidden={!menuOpen ? undefined : false}>
         <div>
           <div className="sidebar-brand">
             <Logo />
@@ -56,6 +76,14 @@ export default function Layout() {
               <h2>Portal Asrama</h2>
               <p>Universitas Andalas</p>
             </div>
+            <button
+              type="button"
+              className="sidebar-close"
+              aria-label="Tutup menu"
+              onClick={() => setMenuOpen(false)}
+            >
+              ×
+            </button>
           </div>
           <div className="sidebar-subcard">
             <span className="subcard-badge">{user.roleTitle.toUpperCase()}</span>
@@ -63,7 +91,13 @@ export default function Layout() {
           </div>
           <nav className="sidebar-nav">
             {NAV[user.role].map(item => (
-              <NavLink key={item.to} to={item.to} end={item.end} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                onClick={() => setMenuOpen(false)}
+                className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+              >
                 {ICONS[item.icon]}
                 <span>{item.label}</span>
               </NavLink>
@@ -79,6 +113,17 @@ export default function Layout() {
       <div className="main-wrapper">
         <header className="top-header">
           <div className="top-header-left">
+            <button
+              type="button"
+              className="menu-toggle"
+              aria-label="Buka menu"
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen(true)}
+            >
+              <span />
+              <span />
+              <span />
+            </button>
             <span className="portal-tag">ASRAMA UNAND</span>
             <span className="header-subtitle">Sistem Informasi Presensi Digital Mahasiswa</span>
           </div>
