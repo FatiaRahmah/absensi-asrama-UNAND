@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { api } from '../../api.js';
 import { Empty, ErrorBox, Loading, Modal, PageHeader, useFetch, useToast } from '../../components/ui.jsx';
+import { fmtDateTime } from '../../utils.js';
 
 const ROLE_LABEL = { admin: 'Admin', fasil: 'Fasilitator', penghuni: 'Penghuni' };
 const EMPTY_FORM = {
@@ -64,7 +65,7 @@ export default function AdminUsers() {
             !filtered.length ? <Empty>Tidak ada pengguna.</Empty> : (
               <div className="table-wrap">
                 <table className="table">
-                  <thead><tr><th>Nama</th><th>NIM/NIP</th><th>Role</th><th>Gedung / Kamar</th><th>Fasil</th><th>Status</th><th className="num">Aksi</th></tr></thead>
+                  <thead><tr><th>Nama</th><th>NIM/NIP</th><th>Role</th><th>Gedung / Kamar</th><th>Fasil</th><th>Waktu Dibuat</th><th>Status</th><th className="num">Aksi</th></tr></thead>
                   <tbody>
                     {filtered.map(u => (
                       <tr key={u.nim_nip} className={u.aktif ? '' : 'muted-row'}>
@@ -77,6 +78,7 @@ export default function AdminUsers() {
                           {u.role === 'admin' && '-'}
                         </td>
                         <td className="small">{u.role === 'penghuni' ? (u.fasil_nama || <span className="c-red">Belum ada fasil</span>) : '-'}</td>
+                        <td className="small">{fmtDateTime(u.created_at)}</td>
                         <td><span className={`pill ${u.aktif ? 'hadir' : 'alpa'}`}>{u.aktif ? 'Aktif' : 'Nonaktif'}</span></td>
                         <td className="num actions">
                           <button className="btn btn-outline btn-sm" onClick={() => setEditing(u)}>Edit</button>

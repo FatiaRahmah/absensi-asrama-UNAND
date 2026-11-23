@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../../api.js';
+import { useAuth } from '../../auth.jsx';
 import { PageHeader, StatusPill, useFetch, useToast } from '../../components/ui.jsx';
-import { SESI_LABEL, fmtMinutes, todayKey } from '../../utils.js';
+import { dateKey, SESI_LABEL, fmtMinutes, todayKey } from '../../utils.js';
 
 const SCHEDULE = {
   subuh: { start: 240, end: 360, label: '04.00 - 06.00 WIB' },
@@ -28,6 +29,7 @@ const getPosition = () => new Promise((resolve, reject) => {
 
 export default function Presensi() {
   const toast = useToast();
+  const { user } = useAuth();
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const [facing, setFacing] = useState('user');
@@ -95,8 +97,21 @@ export default function Presensi() {
   };
 
   const week = (() => {
-    const since = new Date(); since.setDate(since.getDate() - 6);
-    const rows = (history.data?.records || []).filter(r => r.tanggal >= `${since.getFullYear()}-${String(since.getMonth() + 1).padStart(2, '0')}-${String(since.getDate()).padStart(2, '0')}`);
+    const createdAt = user?.created_at ? new Date(user.created_at) : null;
+    const accountAge = createdAt ? now.getTime() - createdAt.getTime() : 0;
+    if (!createdAt || Number.isNaN(createdAt.getTime()) || accountAge < 24 * 60 * 60 * 1000) {
+      return { hadir: 0, izin: 0, alpa: 0, total: 0, persen: 0 };
+    }
+
+    const since = new Date(now);
+    since.setDate(since.getDate() - 6);
+    since.setHours(0, 0, 0, 0);
+    const rows = (history.data?.records || []).filter(r =>
+      r.tanggal >= dateKey(since) &&
+      r.waktu_presensi &&
+      new Date(r.waktu_presensi).getTime() >= createdAt.getTime() &&
+      new Date(r.waktu_presensi).getTime() <= now.getTime()
+    );
     const c = { hadir: 0, izin: 0, alpa: 0 };
     rows.forEach(r => { if (r.status === 'izin') c.izin++; else if (r.status === 'alpa') c.alpa++; else c.hadir++; });
     const total = c.hadir + c.izin + c.alpa;

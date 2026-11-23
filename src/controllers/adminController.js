@@ -9,6 +9,7 @@ function mapUser(row) {
 		nim_nip: row.nim,
 		nama: row.nama,
 		email: row.email,
+		created_at: row.created_at,
 		role: row.role || 'penghuni',
 		aktif: Boolean(row.aktif),
 		fasil_id: row.fasil_id,
@@ -27,7 +28,7 @@ function mapUser(row) {
 }
 
 const USER_SELECT = `
-	SELECT u.nim, u.nama, u.email, u.kamar_id, u.role, u.aktif, u.fasil_id, u.gedung_id,
+	SELECT u.nim, u.nama, u.email, u.created_at, u.kamar_id, u.role, u.aktif, u.fasil_id, u.gedung_id,
 	       f.nama AS fasil_nama,
 	       k.no_kamar, k.lantai, k.gedung_id AS k_gedung_id, g.nama AS nama_gedung,
 	       pj_g.id AS pj_gedung_id, pj_g.nama AS pj_nama_gedung

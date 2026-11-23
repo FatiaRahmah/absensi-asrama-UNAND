@@ -78,6 +78,7 @@ model user {
   gedung_id Int?
   role      user_role   @default(penghuni)
   aktif     Boolean     @default(true)
+  created_at DateTime   @default(now()) @db.DateTime(0)
   izin      izin[]
   presensi  presensi[]
   kamar     kamar?      @relation(fields: [kamar_id], references: [id], map: "user_ibfk_1")

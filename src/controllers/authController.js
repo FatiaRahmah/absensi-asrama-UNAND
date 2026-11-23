@@ -15,6 +15,7 @@ function serializeUser(user) {
 		nim: user.nim,
 		name: user.nama,
 		email: user.email,
+		created_at: user.created_at,
 		role: role,
 		roleTitle: role === 'penghuni' ? 'Penghuni' : role === 'fasil' ? 'Fasilitator' : 'Administrator',
 		avatar: '',
@@ -30,7 +31,7 @@ async function login(ctx) {
 	}
 
 	const users = await prisma.$queryRaw`
-		SELECT nim, nama, email, password, kamar_id, role, aktif
+		SELECT nim, nama, email, password, kamar_id, role, aktif, created_at
 		FROM \`user\`
 		WHERE nim = ${identifier} OR email = ${identifier}
 		LIMIT 1
@@ -66,7 +67,7 @@ async function login(ctx) {
 
 async function me(ctx) {
 	const users = await prisma.$queryRaw`
-		SELECT nim, nama, email, kamar_id, role
+		SELECT nim, nama, email, kamar_id, role, created_at
 		FROM \`user\`
 		WHERE nim = ${ctx.state.user.nim}
 		LIMIT 1

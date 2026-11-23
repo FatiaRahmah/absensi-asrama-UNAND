@@ -13,6 +13,12 @@ export function fmtDate(key) {
   return `${d} ${MONTHS[m - 1]} ${y}`;
 }
 
+export function fmtDateTime(value) {
+  if (!value) return '-';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
+}
+
 export function fmtShort(key) {
   const [, m, d] = key.split('-').map(Number);
   return `${d} ${MONTHS[m - 1]}`;
