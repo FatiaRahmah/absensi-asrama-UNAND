@@ -77,6 +77,23 @@ async function normalizeRelations(ctx, role, input) {
 	return rel;
 }
 
+async function ensureRoomHasSpace(ctx, role, roomId, active, excludeNim = null) {
+	if (role !== 'penghuni' || !roomId || !active) return;
+	const kamarId = Number(roomId);
+	const [room] = await prisma.$queryRaw`SELECT kapasitas FROM kamar WHERE id = ${kamarId} LIMIT 1`;
+	if (!room) ctx.throw(400, 'Kamar tidak ditemukan');
+	const [occupancy] = excludeNim
+		? await prisma.$queryRaw`
+			SELECT COUNT(*) AS terisi FROM \`user\`
+			WHERE kamar_id = ${kamarId} AND role = 'penghuni' AND aktif = 1 AND nim <> ${excludeNim}`
+		: await prisma.$queryRaw`
+			SELECT COUNT(*) AS terisi FROM \`user\`
+			WHERE kamar_id = ${kamarId} AND role = 'penghuni' AND aktif = 1`;
+	if (Number(occupancy.terisi) >= Number(room.kapasitas)) {
+		ctx.throw(409, 'Penghuni di kamar ini sudah penuh');
+	}
+}
+
 async function createUser(ctx) {
 	const body = ctx.request.body || {};
 	const { nim_nip, nama, email, password, role } = body;
@@ -86,6 +103,7 @@ async function createUser(ctx) {
 	if (!ROLES.includes(role)) ctx.throw(400, 'Role tidak valid');
 	if (password.length < 6) ctx.throw(400, 'Password minimal 6 karakter');
 	const rel = await normalizeRelations(ctx, role, body);
+	await ensureRoomHasSpace(ctx, role, rel.kamar_id, body.aktif !== false);
 
 	await prisma.$executeRaw`
 		INSERT INTO \`user\` (nim, nama, email, password, role, kamar_id, fasil_id, gedung_id, aktif)
@@ -113,6 +131,7 @@ async function updateUser(ctx) {
 		fasil_id: 'fasil_id' in body ? body.fasil_id : current.fasil_id,
 		gedung_id: 'gedung_id' in body ? body.gedung_id : current.gedung_id
 	});
+	await ensureRoomHasSpace(ctx, role, rel.kamar_id, 'aktif' in body ? Boolean(body.aktif) : current.aktif, nim);
 
 	const sets = ['nama = ?', 'email = ?', 'role = ?', 'kamar_id = ?', 'fasil_id = ?', 'gedung_id = ?', 'aktif = ?'];
 	const params = [
