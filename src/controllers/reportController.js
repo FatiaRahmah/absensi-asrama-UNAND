@@ -6,6 +6,7 @@ const {
 } = require('../utils/attendance');
 
 const HADIR_SQL = "p.status IN ('hadir','terlambat')";
+const NON_DEMO_SQL = "(p.keterangan IS NULL OR p.keterangan NOT LIKE '%DEMO%')";
 const query = (sql, ...params) => prisma.$queryRawUnsafe(sql, ...params);
 
 function monthRange(dateKey) {
@@ -70,7 +71,7 @@ async function todayCards(today, fasilNim) {
 	);
 	const rows = await query(
 		`SELECT p.sesi, p.status, COUNT(*) AS c FROM presensi p JOIN \`user\` u ON u.nim = p.nim
-		 WHERE p.tanggal = ? AND u.role = 'penghuni' AND u.aktif = 1 ${scope} GROUP BY p.sesi, p.status`,
+		 WHERE p.tanggal = ? AND u.role = 'penghuni' AND u.aktif = 1 AND ${NON_DEMO_SQL} ${scope} GROUP BY p.sesi, p.status`,
 		today, ...params
 	);
 	const result = { subuh: zeroCounts(), malam: zeroCounts() };
@@ -106,7 +107,7 @@ async function adminDashboard(ctx) {
 		 FROM gedung g
 		 LEFT JOIN kamar k ON k.gedung_id = g.id
 		 LEFT JOIN \`user\` u ON u.kamar_id = k.id AND u.role = 'penghuni' AND u.aktif = 1
-		 LEFT JOIN presensi p ON p.nim = u.nim AND p.tanggal = ?
+		 LEFT JOIN presensi p ON p.nim = u.nim AND p.tanggal = ? AND ${NON_DEMO_SQL}
 		 GROUP BY g.id, g.nama ORDER BY g.nama`, today
 	)).map(r => ({ id: r.id, nama: r.nama, penghuni: num(r.penghuni), hadir: num(r.hadir), izin: num(r.izin), alpa: num(r.alpa) }));
 
@@ -145,7 +146,7 @@ async function adminDashboard(ctx) {
 	const trendRows = await query(
 		`SELECT DATE_FORMAT(p.tanggal, '%Y-%m-%d') AS tanggal, SUM(${HADIR_SQL}) AS hadir, COUNT(*) AS total
 		 FROM presensi p JOIN \`user\` u ON u.nim = p.nim
-		 WHERE p.tanggal BETWEEN ? AND ? AND u.role = 'penghuni' GROUP BY p.tanggal`, from, today
+		 WHERE p.tanggal BETWEEN ? AND ? AND u.role = 'penghuni' AND ${NON_DEMO_SQL} GROUP BY p.tanggal`, from, today
 	);
 	const trendMap = new Map(trendRows.map(r => [r.tanggal, r]));
 	const tren = Array.from({ length: 7 }, (_, i) => {
@@ -189,7 +190,7 @@ async function fasilDashboard(ctx) {
 	const belumAbsen = (await query(
 		`SELECT u.nim, u.nama FROM \`user\` u
 		 WHERE u.role = 'penghuni' AND u.aktif = 1 AND u.fasil_id = ?
-		   AND NOT EXISTS (SELECT 1 FROM presensi p WHERE p.nim = u.nim AND p.tanggal = ? AND p.sesi = ?)
+		   AND NOT EXISTS (SELECT 1 FROM presensi p WHERE p.nim = u.nim AND p.tanggal = ? AND p.sesi = ? AND (p.keterangan IS NULL OR p.keterangan NOT LIKE '%DEMO%'))
 		 ORDER BY u.nama`, me, today, focus
 	));
 
@@ -209,7 +210,7 @@ async function fasilDashboard(ctx) {
 	const history = await query(
 		`SELECT p.nim, u.nama, DATE_FORMAT(p.tanggal, '%Y-%m-%d') AS tanggal, p.sesi, p.status
 		 FROM presensi p JOIN \`user\` u ON u.nim = p.nim
-		 WHERE u.fasil_id = ? AND u.role = 'penghuni' AND u.aktif = 1 AND p.tanggal >= ?
+		 WHERE u.fasil_id = ? AND u.role = 'penghuni' AND u.aktif = 1 AND p.tanggal >= ? AND ${NON_DEMO_SQL}
 		 ORDER BY p.tanggal, FIELD(p.sesi, 'subuh', 'malam')`, me, since
 	);
 	const now = new Date();
@@ -233,7 +234,7 @@ async function fasilDashboard(ctx) {
 		`SELECT COALESCE(SUM(${HADIR_SQL}), 0) AS hadir,
 			COALESCE(SUM(p.status = 'izin'), 0) AS izin, COALESCE(SUM(p.status = 'alpa'), 0) AS alpa
 		 FROM presensi p JOIN \`user\` u ON u.nim = p.nim
-		 WHERE u.fasil_id = ? AND u.role = 'penghuni' AND p.tanggal BETWEEN ? AND ?`,
+		 WHERE u.fasil_id = ? AND u.role = 'penghuni' AND p.tanggal BETWEEN ? AND ? AND ${NON_DEMO_SQL}`,
 		me, month.from, today
 	);
 	const bulan = { hadir: num(monthRow.hadir), izin: num(monthRow.izin), alpa: num(monthRow.alpa) };
@@ -266,7 +267,7 @@ async function rekap(ctx) {
 	const mode = user.role === 'fasil' ? 'penghuni' : (['gedung', 'penghuni', 'fasil'].includes(q.mode) ? q.mode : 'gedung');
 
 	const joinParams = [from, to];
-	let join = 'p.nim = u.nim AND p.tanggal BETWEEN ? AND ?';
+	let join = `p.nim = u.nim AND p.tanggal BETWEEN ? AND ? AND ${NON_DEMO_SQL}`;
 	if (sesi) { join += ' AND p.sesi = ?'; joinParams.push(sesi); }
 
 	let where = "u.role = 'penghuni'";
@@ -431,7 +432,7 @@ async function kalenderBinaan(ctx) {
 	const range = monthRange(`${bulan}-01`);
 	const rows = await query(
 		`SELECT p.id, DATE_FORMAT(p.tanggal, '%Y-%m-%d') AS tanggal, p.sesi, p.status, p.keterangan
-		 FROM presensi p WHERE p.nim = ? AND p.tanggal BETWEEN ? AND ? ORDER BY p.tanggal`,
+		 FROM presensi p WHERE p.nim = ? AND p.tanggal BETWEEN ? AND ? AND ${NON_DEMO_SQL} ORDER BY p.tanggal`,
 		nim, range.from, range.to
 	);
 	const hari = {};

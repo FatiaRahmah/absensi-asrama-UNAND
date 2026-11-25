@@ -5,6 +5,21 @@ const prisma = require('../config/database');
 const { checkAsramaRadius } = require('../utils/geoCheck');
 const { SESI, ensureAlpa } = require('../utils/attendance');
 
+let demoModeEnabled = process.env.PRESENSI_DEMO_MODE === 'true';
+const demoModeAvailable = process.env.NODE_ENV !== 'production';
+
+async function config(ctx) {
+	ctx.body = { available: demoModeAvailable, demoMode: demoModeAvailable && demoModeEnabled };
+}
+
+async function setDemoMode(ctx) {
+	if (!demoModeAvailable) ctx.throw(403, 'Mode demo tidak tersedia di lingkungan production');
+	const { enabled } = ctx.request.body || {};
+	if (typeof enabled !== 'boolean') ctx.throw(400, 'Status mode demo tidak valid');
+	demoModeEnabled = enabled;
+	ctx.body = { available: true, demoMode: demoModeEnabled };
+}
+
 async function list(ctx) {
 	await ensureAlpa();
 	const { role, nim } = ctx.state.user;
@@ -54,11 +69,13 @@ async function list(ctx) {
 }
 
 async function create(ctx) {
-	const { jenis_presensi, lat, long, foto } = ctx.request.body || {};
+	const { jenis_presensi, lat, long, foto, waktu_simulasi } = ctx.request.body || {};
 	if (!SESI[jenis_presensi]) ctx.throw(400, 'Sesi presensi tidak valid');
+	if (waktu_simulasi && (!demoModeAvailable || !demoModeEnabled)) ctx.throw(403, 'Simulasi waktu hanya tersedia dalam mode demo');
 	if (!Number.isFinite(Number(lat)) || !Number.isFinite(Number(long))) {
 		ctx.throw(400, 'Lokasi perangkat wajib diizinkan');
 	}
+	if (Number(lat) < -90 || Number(lat) > 90 || Number(long) < -180 || Number(long) > 180) ctx.throw(400, 'Koordinat GPS tidak valid');
 	const imageMatch = typeof foto === 'string' && foto.match(/^data:image\/(jpeg|png);base64,([A-Za-z0-9+/]+=*)$/);
 	if (!imageMatch) ctx.throw(400, 'Bukti foto tidak valid');
 
@@ -67,18 +84,34 @@ async function create(ctx) {
 		ctx.throw(400, `Lokasi Anda berada di luar area asrama UNAND. Gedung terdekat: ${geoResult.gedungNama} (${geoResult.jarakMeter}m). Radius yang diizinkan: 30m.`);
 	}
 
-	const now = new Date();
-	const minutes = now.getHours() * 60 + now.getMinutes();
+	let now = new Date();
+	let today;
+	let clock;
+	if (waktu_simulasi) {
+		if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(waktu_simulasi)) ctx.throw(400, 'Waktu simulasi tidak valid');
+		const [datePart, timePart] = waktu_simulasi.split('T');
+		const [year, month, day] = datePart.split('-').map(Number);
+		const [hour, minute] = timePart.split(':').map(Number);
+		const checkDate = new Date(Date.UTC(year, month - 1, day, hour, minute));
+		if (checkDate.toISOString().slice(0, 16) !== waktu_simulasi) ctx.throw(400, 'Waktu simulasi tidak valid');
+		now = new Date(Date.UTC(year, month - 1, day, hour - 7, minute));
+		today = datePart;
+		clock = `${timePart}:00`;
+	}
+	const minutes = waktu_simulasi
+		? Number(waktu_simulasi.slice(11, 13)) * 60 + Number(waktu_simulasi.slice(14, 16))
+		: now.getHours() * 60 + now.getMinutes();
 	const session = SESI[jenis_presensi];
 	if (minutes < session.start || minutes > session.end) {
 		ctx.throw(400, 'Presensi hanya dapat dikirim pada jadwal sesi yang aktif');
 	}
 
-	const today = now.toLocaleDateString('sv-SE');
-	const clock = now.toTimeString().slice(0, 8);
-	const existing = await prisma.$queryRaw`
+	today ||= now.toLocaleDateString('sv-SE');
+	clock ||= now.toTimeString().slice(0, 8);
+	const existing = waktu_simulasi ? [] : await prisma.$queryRaw`
 		SELECT id, status FROM presensi
 		WHERE nim = ${ctx.state.user.nim} AND tanggal = ${today} AND sesi = ${jenis_presensi}
+		  AND (keterangan IS NULL OR keterangan NOT LIKE '%DEMO%')
 		LIMIT 1
 	`;
 	if (existing.length) {
@@ -92,12 +125,13 @@ async function create(ctx) {
 	const filename = `${randomUUID()}.${imageMatch[1] === 'png' ? 'png' : 'jpg'}`;
 	const photoPath = path.join(uploadDir, filename);
 	await fs.writeFile(photoPath, Buffer.from(imageMatch[2], 'base64'));
+	const keterangan = `${waktu_simulasi ? '[DEMO] ' : ''}Sesi: ${jenis_presensi} • ${geoResult.gedungNama}${waktu_simulasi ? ' • DEMO' : ''}`;
 
 	try {
 		await prisma.$executeRaw`
 			INSERT INTO presensi (nim, tanggal, jam, waktu, lat, \`long\`, foto_wajah, status, sesi, keterangan)
-			VALUES (${ctx.state.user.nim}, ${today}, ${clock}, ${now}, ${Number(lat)}, ${Number(long)},
-			        ${`/uploads/foto_wajah/${filename}`}, 'hadir', ${jenis_presensi}, ${`Sesi: ${jenis_presensi} • ${geoResult.gedungNama}`})
+			VALUES (${ctx.state.user.nim}, ${today}, ${clock}, ${waktu_simulasi ? `${today} ${clock}` : now}, ${Number(lat)}, ${Number(long)},
+				${`/uploads/foto_wajah/${filename}`}, 'hadir', ${jenis_presensi}, ${keterangan})
 		`;
 		ctx.status = 201;
 		ctx.body = { record: { id: null, nim: ctx.state.user.nim, tanggal: today, jam: clock, status: 'hadir' } };
@@ -115,7 +149,7 @@ async function correct(ctx) {
 	if (!keterangan || String(keterangan).trim().length < 3) ctx.throw(400, 'Keterangan koreksi wajib diisi');
 
 	const [row] = await prisma.$queryRaw`
-		SELECT p.id, p.status, u.fasil_id FROM presensi p JOIN \`user\` u ON u.nim = p.nim WHERE p.id = ${id} LIMIT 1`;
+		SELECT p.id, p.status, p.keterangan, u.fasil_id FROM presensi p JOIN \`user\` u ON u.nim = p.nim WHERE p.id = ${id} LIMIT 1`;
 	if (!row) ctx.throw(404, 'Data presensi tidak ditemukan');
 
 	const { role, nim } = ctx.state.user;
@@ -127,7 +161,7 @@ async function correct(ctx) {
 		}
 	}
 
-	const note = `Koreksi ${row.status} → ${status} oleh ${nim}: ${String(keterangan).trim()}`.slice(0, 1000);
+	const note = `${String(row.keterangan || '').includes('DEMO') ? '[DEMO] ' : ''}Koreksi ${row.status} → ${status} oleh ${nim}: ${String(keterangan).trim()}`.slice(0, 1000);
 	await prisma.$executeRaw`UPDATE presensi SET status = ${status}, keterangan = ${note} WHERE id = ${id}`;
 	ctx.body = { success: true, id, status, keterangan: note };
 }
@@ -143,4 +177,4 @@ async function remove(ctx) {
 	ctx.body = { success: true };
 }
 
-module.exports = { list, create, correct, remove };
+module.exports = { list, create, config, setDemoMode, correct, remove };

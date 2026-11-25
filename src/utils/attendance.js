@@ -63,7 +63,8 @@ async function insertAlpa(today, sesiKeys) {
 			 SELECT u.nim, ?, ?, ?, 'alpa', ?, 'Otomatis: tidak melakukan presensi'
 			 FROM \`user\` u
 			 WHERE u.role = 'penghuni' AND u.aktif = 1
-			   AND NOT EXISTS (SELECT 1 FROM presensi p WHERE p.nim = u.nim AND p.tanggal = ? AND p.sesi = ?)`,
+			   AND NOT EXISTS (SELECT 1 FROM presensi p WHERE p.nim = u.nim AND p.tanggal = ? AND p.sesi = ?
+			     AND (p.keterangan IS NULL OR p.keterangan NOT LIKE '%DEMO%'))`,
 			today, s.endTime, `${today} ${s.endTime}`, key, today, key
 		);
 	}
@@ -82,7 +83,8 @@ async function applyIzin(nim, tanggal, alasan) {
 		await prisma.$executeRawUnsafe(
 			`INSERT INTO presensi (nim, tanggal, jam, waktu, status, sesi, keterangan)
 			 SELECT ?, ?, ?, ?, 'izin', ?, ?
-			 WHERE NOT EXISTS (SELECT 1 FROM presensi WHERE nim = ? AND tanggal = ? AND sesi = ?)`,
+			 WHERE NOT EXISTS (SELECT 1 FROM presensi WHERE nim = ? AND tanggal = ? AND sesi = ?
+			   AND (keterangan IS NULL OR keterangan NOT LIKE '%DEMO%'))`,
 			nim, tanggal, s.endTime, `${tanggal} ${s.endTime}`, key, keterangan, nim, tanggal, key
 		);
 	}

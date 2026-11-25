@@ -27,6 +27,18 @@ const getPosition = () => new Promise((resolve, reject) => {
   );
 });
 
+const localDateTimeInput = date => {
+  const pad = value => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
+const nextDemoSession = () => {
+  const date = new Date();
+  date.setDate(date.getDate() + 1);
+  date.setHours(4, 30, 0, 0);
+  return localDateTimeInput(date);
+};
+
 export default function Presensi() {
   const toast = useToast();
   const { user } = useAuth();
@@ -38,6 +50,12 @@ export default function Presensi() {
   const [now, setNow] = useState(new Date());
   const [busy, setBusy] = useState(false);
   const history = useFetch(() => api.get('/presensi'), []);
+  const config = useFetch(() => api.get('/presensi/config'), []);
+  const demoMode = config.data?.demoMode === true;
+  const [simulatedAt, setSimulatedAt] = useState(nextDemoSession);
+  const [simulatedSession, setSimulatedSession] = useState('subuh');
+  const [simulatedGps, setSimulatedGps] = useState({ lat: '-0.9175609', long: '100.4539945' });
+  const [demoToggleBusy, setDemoToggleBusy] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
@@ -65,17 +83,41 @@ export default function Presensi() {
     return () => streamRef.current?.getTracks().forEach(t => t.stop());
   }, [startCamera]);
 
-  const session = currentSession(now);
-  const today = todayKey();
-  const todayRecords = (history.data?.records || []).filter(r => r.tanggal === today);
-  const doneToday = session.key && todayRecords.find(r => r.jenis_presensi === session.key);
+  const session = currentSession(demoMode && simulatedAt ? new Date(`${simulatedAt}:00+07:00`) : now);
+  const activeSession = demoMode ? simulatedSession : session.key;
+  const today = demoMode && simulatedAt ? simulatedAt.slice(0, 10) : todayKey();
+  const todayRecords = (history.data?.records || []).filter(r =>
+    r.tanggal === today && !String(r.keterangan || '').includes('DEMO')
+  );
+  const doneToday = !demoMode && activeSession && todayRecords.find(r => r.jenis_presensi === activeSession);
+
+  const toggleDemoMode = async () => {
+    const enabled = !demoMode;
+    if (enabled && !window.confirm('Aktifkan mode demo? Presensi yang berhasil akan disimpan ke database dan ditandai DEMO.')) return;
+    setDemoToggleBusy(true);
+    try {
+      await api.patch('/presensi/demo-mode', { enabled });
+      if (enabled) {
+        setSimulatedAt(nextDemoSession());
+        setSimulatedSession('subuh');
+      }
+      toast(enabled ? 'Mode demo diaktifkan.' : 'Mode demo dinonaktifkan.');
+      config.reload();
+    } catch (err) {
+      toast(err.message, 'error');
+    } finally {
+      setDemoToggleBusy(false);
+    }
+  };
 
   const capture = async () => {
     const video = videoRef.current;
     if (!cameraOn || !video || video.readyState < 2) return toast('Aktifkan kamera sebelum mengirim presensi.', 'warning');
     setBusy(true);
     try {
-      const coords = await getPosition();
+      const coords = demoMode
+        ? { latitude: Number(simulatedGps.lat), longitude: Number(simulatedGps.long) }
+        : await getPosition();
       const canvas = document.createElement('canvas');
       canvas.width = 640;
       canvas.height = 480;
@@ -85,7 +127,8 @@ export default function Presensi() {
       ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
       ctx.restore();
       await api.post('/presensi', {
-        jenis_presensi: session.key, lat: coords.latitude, long: coords.longitude, foto: canvas.toDataURL('image/jpeg', 0.85)
+        jenis_presensi: activeSession, lat: coords.latitude, long: coords.longitude,
+        ...(demoMode ? { waktu_simulasi: simulatedAt } : {}), foto: canvas.toDataURL('image/jpeg', 0.85)
       });
       toast('Presensi berhasil dicatat.');
       history.reload();
@@ -107,6 +150,7 @@ export default function Presensi() {
     since.setDate(since.getDate() - 6);
     since.setHours(0, 0, 0, 0);
     const rows = (history.data?.records || []).filter(r =>
+      !String(r.keterangan || '').includes('DEMO') &&
       r.tanggal >= dateKey(since) &&
       r.waktu_presensi &&
       new Date(r.waktu_presensi).getTime() >= createdAt.getTime() &&
@@ -118,10 +162,10 @@ export default function Presensi() {
     return { ...c, total, persen: total ? Math.round((c.hadir / total) * 100) : 0 };
   })();
 
-  const disabled = busy || !session.key || Boolean(doneToday) || !cameraOn;
+  const disabled = busy || (!demoMode && !session.key) || Boolean(doneToday) || !cameraOn;
   let buttonText = 'Ambil Foto & Catat Kehadiran';
-  if (!session.key) buttonText = `Di luar jadwal • Sesi ${SESI_LABEL[session.next]} dibuka ${fmtMinutes(session.buka)} lagi`;
-  else if (doneToday) buttonText = `Sesi ${SESI_LABEL[session.key]} sudah tercatat (${doneToday.status})`;
+  if (!demoMode && !session.key) buttonText = `Di luar jadwal • Sesi ${SESI_LABEL[session.next]} dibuka ${fmtMinutes(session.buka)} lagi`;
+  else if (doneToday) buttonText = `Sesi ${SESI_LABEL[activeSession]} sudah tercatat (${doneToday.status})`;
 
   return (
     <>
@@ -130,6 +174,9 @@ export default function Presensi() {
           <div className="clock-date">{now.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</div>
           <div className="clock-time">{now.toLocaleTimeString('id-ID', { hour12: false })} WIB</div>
         </div>
+        {config.data?.available && <button className={`btn ${demoMode ? 'btn-danger' : 'btn-outline'}`} disabled={demoToggleBusy} onClick={toggleDemoMode}>
+          {demoToggleBusy ? 'Mengubah...' : demoMode ? 'Matikan Mode Demo' : 'Aktifkan Mode Demo'}
+        </button>}
       </PageHeader>
 
       <div className={`session-banner ${session.key ? 'on' : 'off'}`}>
@@ -141,6 +188,26 @@ export default function Presensi() {
       <div className="grid-2">
         <div>
           <div className="card camera-card">
+            {demoMode && <div className="card" style={{ marginBottom: 16, border: '1px solid var(--amber, #d99b00)' }}>
+              <h3>Mode Demo Presensi</h3>
+              <p className="muted small">Simulasi ini aktif dari konfigurasi server. Data yang berhasil dikirim akan tercatat sebagai presensi demo.</p>
+              <label className="form-group"><span className="form-label">Waktu simulasi (WIB)</span>
+                <input className="form-input" type="datetime-local" value={simulatedAt} onChange={e => setSimulatedAt(e.target.value)} required /></label>
+              <label className="form-group"><span className="form-label">Sesi yang diuji</span>
+                <select className="form-select" value={simulatedSession} onChange={e => setSimulatedSession(e.target.value)}>
+                  <option value="subuh">Subuh (04.00–06.00)</option><option value="malam">Malam (18.00–20.30)</option>
+                </select></label>
+              <div className="btn-row">
+                <button type="button" className="btn btn-outline btn-sm" onClick={() => setSimulatedGps({ lat: '-0.9175609', long: '100.4539945' })}>GPS dalam radius</button>
+                <button type="button" className="btn btn-outline btn-sm" onClick={() => setSimulatedGps({ lat: '0', long: '0' })}>GPS luar radius</button>
+              </div>
+              <div className="form-grid" style={{ marginTop: 12 }}>
+                <label className="form-group"><span className="form-label">Latitude</span>
+                  <input className="form-input" type="number" step="any" value={simulatedGps.lat} onChange={e => setSimulatedGps(g => ({ ...g, lat: e.target.value }))} /></label>
+                <label className="form-group"><span className="form-label">Longitude</span>
+                  <input className="form-input" type="number" step="any" value={simulatedGps.long} onChange={e => setSimulatedGps(g => ({ ...g, long: e.target.value }))} /></label>
+              </div>
+            </div>}
             <div className="camera-view">
               <video ref={videoRef} autoPlay playsInline muted className="mirror" />
               {!cameraOn && <div className="camera-placeholder">{camError || 'Mengaktifkan kamera...'}</div>}

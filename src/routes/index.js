@@ -31,6 +31,8 @@ router.post('/kamar', authenticate, allowRoles('admin'), adminController.createK
 router.delete('/kamar/:id', authenticate, allowRoles('admin'), adminController.deleteKamar);
 router.get('/residents', authenticate, allowRoles('admin', 'fasil'), adminController.listResidents);
 router.get('/presensi', authenticate, presensiController.list);
+router.get('/presensi/config', authenticate, allowRoles('penghuni'), presensiController.config);
+router.patch('/presensi/demo-mode', authenticate, allowRoles('penghuni'), presensiController.setDemoMode);
 router.post('/presensi', authenticate, allowRoles('penghuni'), presensiController.create);
 router.patch('/presensi/:id', authenticate, allowRoles('admin', 'fasil'), presensiController.correct);
 router.delete('/presensi/:id', authenticate, allowRoles('admin'), presensiController.remove);
